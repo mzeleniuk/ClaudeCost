@@ -1,0 +1,41 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { parseSince, startOfMonth } from "../src/since.js";
+
+const NOW = new Date("2025-01-15T12:00:00Z");
+
+test("returns null for undefined", () => {
+  assert.equal(parseSince(undefined, NOW), null);
+});
+
+test("parses relative days", () => {
+  const d = parseSince("7d", NOW);
+  assert.equal(d.toISOString(), "2025-01-08T12:00:00.000Z");
+});
+
+test("parses hours", () => {
+  const d = parseSince("24h", NOW);
+  assert.equal(d.toISOString(), "2025-01-14T12:00:00.000Z");
+});
+
+test("startOfMonth returns first day at local midnight", () => {
+  const d = startOfMonth(NOW);
+  assert.equal(d.getDate(), 1);
+  assert.equal(d.getHours(), 0);
+  assert.equal(d.getMinutes(), 0);
+});
+
+test('parses "today" to local midnight', () => {
+  const d = parseSince("today", NOW);
+  assert.equal(d.getHours(), 0);
+  assert.equal(d.getMinutes(), 0);
+});
+
+test("parses ISO date", () => {
+  const d = parseSince("2025-01-01", NOW);
+  assert.equal(d.getUTCFullYear(), 2025);
+});
+
+test("throws on garbage", () => {
+  assert.throws(() => parseSince("banana", NOW), /invalid --since/);
+});

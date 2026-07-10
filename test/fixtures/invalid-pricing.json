@@ -1,0 +1,8 @@
+{
+  "claude-sonnet-4": {
+    "input": 3.0,
+    "output": "fifteen",
+    "cacheWrite": 3.75,
+    "cacheRead": 0.3
+  }
+}

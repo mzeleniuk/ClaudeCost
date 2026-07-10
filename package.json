@@ -1,0 +1,37 @@
+{
+  "name": "claude-cost",
+  "version": "0.1.0",
+  "description": "Approximate local cost tracking for Claude Code (Vertex AI) by parsing session transcripts.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.12.2"
+  },
+  "bin": {
+    "claude-cost": "bin/claude-cost.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "pricing.config.json",
+    "README.md"
+  ],
+  "scripts": {
+    "start": "node bin/claude-cost.js",
+    "test": "node --test test/",
+    "lint": "for f in bin/*.js src/*.js src/report/*.js; do node --check \"$f\"; done"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "vertex-ai",
+    "cost",
+    "tokens",
+    "cli"
+  ],
+  "author": "",
+  "repository": {
+    "type": "git",
+    "url": ""
+  }
+}

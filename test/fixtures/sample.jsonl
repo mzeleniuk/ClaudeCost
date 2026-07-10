@@ -1,0 +1,6 @@
+{"timestamp":"2025-01-10T10:00:00.000Z","message":{"model":"claude-sonnet-4@20250514","usage":{"input_tokens":100,"output_tokens":50}}}
+{"timestamp":"2025-01-11T10:00:00.000Z","model":"claude-opus-4@20250514","message":{"usage":{"input_tokens":200,"output_tokens":0}}}
+not valid json
+{"timestamp":"2025-01-12T10:00:00.000Z","message":{"model":"claude-sonnet-4","usage":{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":10}}}
+{"timestamp":"bad-date","message":{"model":"claude-sonnet-4","usage":{"input_tokens":5}}}
+{"message":{"model":"claude-sonnet-4","usage":{"input_tokens":25}}}
