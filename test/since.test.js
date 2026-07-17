@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseSince, startOfMonth } from "../src/since.js";
+
+import { formatLocalDateTime, parseSince, startOfMonth } from "../src/since.js";
 
 const NOW = new Date("2025-01-15T12:00:00Z");
 
@@ -16,6 +17,11 @@ test("parses relative days", () => {
 test("parses hours", () => {
   const d = parseSince("24h", NOW);
   assert.equal(d.toISOString(), "2025-01-14T12:00:00.000Z");
+});
+
+test("formatLocalDateTime uses local timezone components", () => {
+  const d = new Date(2026, 6, 1, 0, 0, 0);
+  assert.equal(formatLocalDateTime(d), "2026-07-01 00:00:00");
 });
 
 test("startOfMonth returns first day at local midnight", () => {

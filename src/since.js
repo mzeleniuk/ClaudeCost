@@ -14,6 +14,13 @@ const UNIT_MS = {
   w: 604_800_000,
 };
 
+const pad2 = (n) => String(n).padStart(2, "0");
+
+/** Format a Date for display in the user's local timezone. */
+export function formatLocalDateTime(date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+}
+
 /** First day of the current month at local midnight (inclusive lower bound). */
 export function startOfMonth(now = new Date()) {
   const d = new Date(now);

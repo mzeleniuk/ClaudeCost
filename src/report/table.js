@@ -1,3 +1,5 @@
+import { formatLocalDateTime } from "../since.js";
+
 const fmtUSD = (n) => `$${n.toFixed(4)}`;
 const fmtNum = (n) => n.toLocaleString("en-US");
 
@@ -32,7 +34,9 @@ export function renderTable(
   }
 
   lines.push("");
-  if (since) lines.push(`Since:  ${since.toISOString()}`);
+
+  if (since) lines.push(`Since:  ${formatLocalDateTime(since)} (local)`);
+
   lines.push(
     `Total estimated cost: ${fmtUSD(total.costUSD)}  (${total.messages} messages)`,
   );
