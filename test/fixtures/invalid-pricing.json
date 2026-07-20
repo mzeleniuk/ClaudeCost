@@ -3,6 +3,7 @@
     "input": 3.0,
     "output": "fifteen",
     "cacheWrite": 3.75,
+    "cacheWrite1h": 6.0,
     "cacheRead": 0.3
   }
 }

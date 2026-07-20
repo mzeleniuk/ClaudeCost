@@ -3,7 +3,7 @@ import { priceForModel, computeCost } from "./pricing.js";
 /**
  * Aggregate usage events into totals, optionally grouped by model.
  *
- * @param {AsyncIterable} events  - normalized events from readUsageEvents
+ * @param {AsyncIterable|Iterable} events  - normalized events from readUsageEvents / dedupeEvents
  * @param {object} opts
  *   - pricing: pricing table
  *   - since: Date|null lower bound (inclusive); events without a timestamp are excluded
@@ -40,10 +40,10 @@ export async function aggregate(
 
     const u = ev.usage;
     for (const [field, tok] of [
-      ["inputTokens", u.input_tokens ?? 0],
-      ["outputTokens", u.output_tokens ?? 0],
-      ["cacheWriteTokens", u.cache_creation_input_tokens ?? 0],
-      ["cacheReadTokens", u.cache_read_input_tokens ?? 0],
+      ["inputTokens", u.input ?? 0],
+      ["outputTokens", u.output ?? 0],
+      ["cacheWriteTokens", u.cacheWrite ?? 0],
+      ["cacheReadTokens", u.cacheRead ?? 0],
     ]) {
       bucket[field] += tok;
       total[field] += tok;

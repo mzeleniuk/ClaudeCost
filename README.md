@@ -2,6 +2,8 @@
 
 Approximate local cost tracking for [Claude Code](https://code.claude.com/docs) when billed through **Google Vertex AI**. It parses your local session transcripts and estimates spend — no proxy, no network calls.
 
+By default it merges transcripts from `~/.config/claude/projects` and `~/.claude/projects` (modern path first). Pass `--dir` to scan a single custom location.
+
 > ⚠️ **Approximate.** Prices vary by region and negotiated rates. Always reconcile against your GCP Billing export for authoritative numbers.
 
 ## Install
@@ -65,7 +67,7 @@ claude-cost --pricing ./my-prices.json
 
 ## Pricing
 
-Edit `pricing.config.json` (USD per 1,000,000 tokens). Model names are matched by substring, so `claude-sonnet-4` matches `claude-sonnet-4@20250514`.
+Edit `pricing.config.json` (USD per 1,000,000 tokens). Fields: `input`, `output`, `cacheWrite` (5-minute cache write), `cacheWrite1h` (1-hour cache write), `cacheRead`. Model names are matched by substring, so `claude-sonnet-4` matches `claude-sonnet-4@20250514`.
 
 ## Development
 

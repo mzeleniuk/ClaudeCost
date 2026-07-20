@@ -1,13 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { priceForModel, computeCost, loadPricing } from "../src/pricing.js";
 import { fileURLToPath } from "node:url";
+
+import { priceForModel, computeCost, loadPricing } from "../src/pricing.js";
 
 const PRICING = {
   "claude-sonnet-4": {
     input: 3.0,
     output: 15.0,
     cacheWrite: 3.75,
+    cacheWrite1h: 6.0,
     cacheRead: 0.3,
   },
 };
@@ -20,13 +22,17 @@ test("matches model by substring", () => {
 test("flags unknown models", () => {
   const p = priceForModel(PRICING, "gpt-4");
   assert.equal(p._unknown, true);
+  assert.equal(p.cacheWrite1h, 0);
 });
 
 test("computes cost correctly", () => {
   const p = priceForModel(PRICING, "claude-sonnet-4");
   const cost = computeCost(p, {
-    input_tokens: 1_000_000,
-    output_tokens: 1_000_000,
+    cacheRead: 0,
+    cacheWrite: 0,
+    hasCacheBreakdown: false,
+    input: 1_000_000,
+    output: 1_000_000,
   });
   assert.equal(cost, 18.0); // 3 + 15
 });
@@ -34,16 +40,18 @@ test("computes cost correctly", () => {
 test("prefers longest matching key regardless of key order", () => {
   const pricing = {
     "claude-sonnet-4": {
+      cacheRead: 0,
+      cacheWrite: 0,
+      cacheWrite1h: 0,
       input: 1.0,
       output: 1.0,
-      cacheWrite: 0,
-      cacheRead: 0,
     },
     "claude-sonnet-4.5": {
+      cacheRead: 0,
+      cacheWrite: 0,
+      cacheWrite1h: 0,
       input: 2.0,
       output: 2.0,
-      cacheWrite: 0,
-      cacheRead: 0,
     },
   };
   const p = priceForModel(pricing, "claude-sonnet-4.5@20250514");
@@ -58,11 +66,28 @@ test("loadPricing rejects invalid price fields", () => {
   );
 });
 
-test("includes cache tokens", () => {
+test("flat cache write uses cacheWrite rate", () => {
   const p = priceForModel(PRICING, "claude-sonnet-4");
   const cost = computeCost(p, {
-    cache_read_input_tokens: 1_000_000,
-    cache_creation_input_tokens: 1_000_000,
+    cacheRead: 1_000_000,
+    cacheWrite: 1_000_000,
+    hasCacheBreakdown: false,
+    input: 0,
+    output: 0,
   });
-  assert.equal(cost, 4.05); // 0.30 + 3.75
+  assert.equal(cost, 4.05); // 3.75 + 0.30
+});
+
+test("breakdown prices 5m and 1h separately", () => {
+  const p = priceForModel(PRICING, "claude-sonnet-4");
+  const cost = computeCost(p, {
+    cacheRead: 0,
+    cacheWrite: 2_000_000,
+    cacheWrite1h: 1_000_000,
+    cacheWrite5m: 1_000_000,
+    hasCacheBreakdown: true,
+    input: 0,
+    output: 0,
+  });
+  assert.equal(cost, 9.75); // 3.75 + 6.0
 });

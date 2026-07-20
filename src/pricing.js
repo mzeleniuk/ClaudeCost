@@ -5,7 +5,13 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PRICING_PATH = path.join(__dirname, "..", "pricing.config.json");
 
-const PRICE_FIELDS = ["input", "output", "cacheWrite", "cacheRead"];
+const PRICE_FIELDS = [
+  "input",
+  "output",
+  "cacheWrite",
+  "cacheWrite1h",
+  "cacheRead",
+];
 
 function validatePricing(pricing, filePath) {
   if (
@@ -58,26 +64,41 @@ export function priceForModel(pricing, model = "") {
   const key = keys.find((k) => model.includes(k));
   return key
     ? pricing[key]
-    : { input: 0, output: 0, cacheWrite: 0, cacheRead: 0, _unknown: true };
+    : {
+        _unknown: true,
+        cacheRead: 0,
+        cacheWrite: 0,
+        cacheWrite1h: 0,
+        input: 0,
+        output: 0,
+      };
 }
 
 const PER_MILLION = 1_000_000;
 
 /**
- * Compute USD cost for a single usage record.
- * @param {object} price  - { input, output, cacheWrite, cacheRead }
- * @param {object} usage  - Anthropic usage object
+ * Compute USD cost for a single normalized usage record.
+ * @param {object} price  - { input, output, cacheWrite, cacheWrite1h, cacheRead }
+ * @param {object} usage  - normalized usage from parse.normalizeUsage
  */
 export function computeCost(price, usage = {}) {
-  const input = usage.input_tokens ?? 0;
-  const output = usage.output_tokens ?? 0;
-  const cacheWrite = usage.cache_creation_input_tokens ?? 0;
-  const cacheRead = usage.cache_read_input_tokens ?? 0;
+  const input = usage.input ?? 0;
+  const output = usage.output ?? 0;
+  const cacheRead = usage.cacheRead ?? 0;
+
+  let cacheCost;
+  if (usage.hasCacheBreakdown) {
+    cacheCost =
+      (usage.cacheWrite5m ?? 0) * price.cacheWrite +
+      (usage.cacheWrite1h ?? 0) * price.cacheWrite1h;
+  } else {
+    cacheCost = (usage.cacheWrite ?? 0) * price.cacheWrite;
+  }
 
   return (
     (input * price.input +
       output * price.output +
-      cacheWrite * price.cacheWrite +
+      cacheCost +
       cacheRead * price.cacheRead) /
     PER_MILLION
   );

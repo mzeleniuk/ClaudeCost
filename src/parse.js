@@ -41,18 +41,74 @@ export async function* findTranscripts(dir, visited = new Set()) {
   }
 }
 
+/**
+ * Normalize Anthropic usage into a flat shape for aggregation/pricing.
+ * Prefers cache_creation 5m/1h breakdown when present.
+ */
+export function normalizeUsage(raw = {}) {
+  const breakdown = raw.cache_creation;
+  const hasBreakdown = breakdown != null && typeof breakdown === "object";
+
+  const cacheWrite5m = hasBreakdown
+    ? (breakdown.ephemeral_5m_input_tokens ?? 0)
+    : 0;
+  const cacheWrite1h = hasBreakdown
+    ? (breakdown.ephemeral_1h_input_tokens ?? 0)
+    : 0;
+  const cacheWrite = hasBreakdown
+    ? cacheWrite5m + cacheWrite1h
+    : (raw.cache_creation_input_tokens ?? 0);
+
+  return {
+    cacheRead: raw.cache_read_input_tokens ?? 0,
+    cacheWrite,
+    cacheWrite1h: hasBreakdown ? cacheWrite1h : null,
+    cacheWrite5m: hasBreakdown ? cacheWrite5m : null,
+    hasCacheBreakdown: hasBreakdown,
+    input: raw.input_tokens ?? 0,
+    output: raw.output_tokens ?? 0,
+  };
+}
+
 function hasBillableTokens(usage) {
   return (
-    (usage.input_tokens ?? 0) > 0 ||
-    (usage.output_tokens ?? 0) > 0 ||
-    (usage.cache_read_input_tokens ?? 0) > 0 ||
-    (usage.cache_creation_input_tokens ?? 0) > 0
+    usage.input > 0 ||
+    usage.output > 0 ||
+    usage.cacheRead > 0 ||
+    usage.cacheWrite > 0
   );
 }
 
 /**
+ * Extract advisor_message iterations from usage.
+ * Other iteration types are ignored; top-level usage stays on the main model.
+ * @returns {{ model: string, usage: object }[]}
+ */
+export function advisorUsagesFromRaw(raw = {}) {
+  const iterations = raw.iterations;
+  if (!Array.isArray(iterations) || iterations.length === 0) return [];
+
+  const advisors = [];
+  for (const iteration of iterations) {
+    if (iteration == null || typeof iteration !== "object") continue;
+    if (iteration.type !== "advisor_message") continue;
+    const model = iteration.model;
+    if (typeof model !== "string" || model.length === 0) continue;
+    advisors.push({
+      model,
+      usage: normalizeUsage(iteration),
+    });
+  }
+  return advisors;
+}
+
+/**
  * Stream a JSONL transcript and yield normalized usage events.
- * Each yielded record: { ts: Date|null, model: string, usage: object, file }
+ * Each yielded record: { ts, model, usage, messageId, requestId, file }
+ *
+ * Advisor iterations (type advisor_message) are yielded as separate events
+ * under the advisor model, with messageId `{id}:advisor:{index}` when the
+ * parent has an id.
  *
  * Streaming line-by-line keeps memory flat even for very large transcripts.
  */
@@ -74,17 +130,41 @@ export async function* readUsageEvents(file) {
     }
 
     const msg = rec.message ?? rec;
-    const usage = msg?.usage;
-    if (!usage || !hasBillableTokens(usage)) continue;
+    const rawUsage = msg?.usage;
+    if (!rawUsage) continue;
 
-    const tsRaw = rec.timestamp ?? rec.ts ?? msg?.timestamp;
-    const ts = tsRaw ? new Date(tsRaw) : null;
+    const usage = normalizeUsage(rawUsage);
+    const advisors = advisorUsagesFromRaw(rawUsage);
+    if (!hasBillableTokens(usage) && advisors.length === 0) continue;
 
-    yield {
-      ts: ts && !Number.isNaN(ts.getTime()) ? ts : null,
-      model: msg.model ?? rec.model ?? "unknown",
-      usage,
-      file,
-    };
+    const tsRaw = rec.timestamp || rec.ts || msg?.timestamp;
+    const tsDate = tsRaw ? new Date(tsRaw) : null;
+    const ts = tsDate && !Number.isNaN(tsDate.getTime()) ? tsDate : null;
+    const messageId = msg.id || null;
+    const requestId = rec.requestId || null;
+
+    if (hasBillableTokens(usage)) {
+      yield {
+        ts,
+        model: msg.model || rec.model || "unknown",
+        usage,
+        messageId,
+        requestId,
+        file,
+      };
+    }
+
+    for (let index = 0; index < advisors.length; index++) {
+      const advisor = advisors[index];
+      if (!hasBillableTokens(advisor.usage)) continue;
+      yield {
+        ts,
+        model: advisor.model,
+        usage: advisor.usage,
+        messageId: messageId != null ? `${messageId}:advisor:${index}` : null,
+        requestId,
+        file,
+      };
+    }
   }
 }

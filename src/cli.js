@@ -1,8 +1,9 @@
 import { parseArgs } from "node:util";
-import { resolveTranscriptDir } from "./config.js";
+import { resolveTranscriptDirs } from "./config.js";
 import { loadPricing } from "./pricing.js";
 import { parseSince, startOfMonth } from "./since.js";
 import { findTranscripts, readUsageEvents } from "./parse.js";
+import { dedupeEvents } from "./dedupe.js";
 import { aggregate } from "./aggregate.js";
 import { renderTable } from "./report/table.js";
 import { renderJson } from "./report/json.js";
@@ -51,7 +52,7 @@ export async function run(argv) {
     return;
   }
 
-  const dir = resolveTranscriptDir(values.dir);
+  const dirs = resolveTranscriptDirs(values.dir);
   const pricing = loadPricing(values.pricing);
   if (values.monthly && values.since != null) {
     throw new Error("use either --monthly or --since, not both.");
@@ -59,14 +60,19 @@ export async function run(argv) {
   const since = values.monthly ? startOfMonth() : parseSince(values.since);
   const byModel = values["by-model"];
 
-  // Chain all transcript files into one async event stream.
+  // Chain all transcript files into one async event stream, sharing visited
+  // across dirs so overlapping trees via symlinks are not double-scanned.
   async function* allEvents() {
-    for await (const file of findTranscripts(dir)) {
-      yield* readUsageEvents(file);
+    const visited = new Set();
+    for (const dir of dirs) {
+      for await (const file of findTranscripts(dir, visited)) {
+        yield* readUsageEvents(file);
+      }
     }
   }
 
-  const result = await aggregate(allEvents(), { pricing, since, byModel });
+  const deduped = await dedupeEvents(allEvents());
+  const result = await aggregate(deduped, { pricing, since, byModel });
   const opts = { byModel, since };
 
   if (values.json) {

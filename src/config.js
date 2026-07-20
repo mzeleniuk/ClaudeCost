@@ -4,14 +4,13 @@ import fs from "node:fs";
 
 /**
  * Candidate directories where Claude Code stores session transcripts.
- * We probe these in order; the first that exists wins unless --dir is passed.
+ * Modern path first, then legacy.
  */
 export function defaultTranscriptDirs() {
   const home = os.homedir();
   return [
-    path.join(home, ".claude", "projects"),
     path.join(home, ".config", "claude", "projects"),
-    path.join(home, ".claude"),
+    path.join(home, ".claude", "projects"),
   ];
 }
 
@@ -22,16 +21,36 @@ export function expandHome(p) {
   return p;
 }
 
-export function resolveTranscriptDir(explicitDir) {
+/**
+ * Resolve transcript directories to scan.
+ * With --dir: a single explicit path.
+ * Otherwise: every existing default projects dir (merged), deduped by realpath.
+ */
+export function resolveTranscriptDirs(explicitDir) {
   if (explicitDir) {
     const resolved = expandHome(explicitDir);
     if (!fs.existsSync(resolved)) {
       throw new Error(`transcript directory not found: ${explicitDir}`);
     }
-    return resolved;
+    return [resolved];
   }
-  const found = defaultTranscriptDirs().find((d) => fs.existsSync(d));
-  if (!found) {
+
+  const found = [];
+  const seen = new Set();
+  for (const dir of defaultTranscriptDirs()) {
+    if (!fs.existsSync(dir)) continue;
+    let key = dir;
+    try {
+      key = fs.realpathSync(dir);
+    } catch {
+      // use the original path if realpath fails
+    }
+    if (seen.has(key)) continue;
+    seen.add(key);
+    found.push(dir);
+  }
+
+  if (found.length === 0) {
     throw new Error(
       "could not locate Claude Code transcripts. Pass --dir <path> explicitly.",
     );
