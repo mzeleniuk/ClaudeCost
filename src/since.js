@@ -21,6 +21,12 @@ export function formatLocalDateTime(date) {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
 }
 
+/** "YYYY-MM" in local timezone; returns null if date is invalid. */
+export function monthKey(date) {
+  if (!date || Number.isNaN(date.getTime())) return null;
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`;
+}
+
 /** First day of the current month at local midnight (inclusive lower bound). */
 export function startOfMonth(now = new Date()) {
   const d = new Date(now);

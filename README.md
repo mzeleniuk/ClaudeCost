@@ -47,6 +47,7 @@ claude-cost --since 7d              # last 7 days
 claude-cost --since today           # since local midnight
 claude-cost --since 2025-01-01      # since a date
 claude-cost --monthly               # since start of current month
+claude-cost --by-month              # per-month, per-model history (all time)
 claude-cost --by-model              # per-model breakdown
 claude-cost --json                  # machine-readable output
 claude-cost --dir ~/.claude/projects
@@ -59,11 +60,14 @@ claude-cost --pricing ./my-prices.json
 | ------------ | ------------------------------------------------- |
 | `--since`    | `7d`, `24h`, `90m`, `2w`, `today`, or an ISO date |
 | `--monthly`  | Since the start of the current month (local time) |
+| `--by-month` | Per-month, per-model breakdown across all history |
 | `--by-model` | Break totals down per model                       |
 | `--json`     | Output JSON instead of a table                    |
 | `--dir`      | Override transcript directory                     |
 | `--pricing`  | Path to a custom pricing JSON                     |
 | `-h, --help` | Show help                                         |
+
+`--monthly` filters to the current month only. `--by-month` shows every month in your transcripts, each with a per-model breakdown.
 
 ## Pricing
 

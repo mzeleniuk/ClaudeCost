@@ -1,6 +1,6 @@
 {
   "name": "claude-cost",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Approximate local cost tracking for Claude Code (Vertex AI) by parsing session transcripts.",
   "type": "module",
   "license": "MIT",
@@ -17,6 +17,7 @@
     "README.md"
   ],
   "scripts": {
+    "history": "node bin/claude-cost.js --by-month",
     "lint": "for f in bin/*.js src/*.js src/report/*.js; do node --check \"$f\"; done",
     "monthly": "node bin/claude-cost.js --monthly --by-model",
     "start": "node bin/claude-cost.js",

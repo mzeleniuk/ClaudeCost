@@ -1,7 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { formatLocalDateTime, parseSince, startOfMonth } from "../src/since.js";
+import {
+  formatLocalDateTime,
+  monthKey,
+  parseSince,
+  startOfMonth,
+} from "../src/since.js";
 
 const NOW = new Date("2025-01-15T12:00:00Z");
 
@@ -44,4 +49,15 @@ test("parses ISO date", () => {
 
 test("throws on garbage", () => {
   assert.throws(() => parseSince("banana", NOW), /invalid --since/);
+});
+
+test("monthKey returns YYYY-MM in local timezone", () => {
+  const d = new Date(2026, 6, 1, 0, 0, 0);
+  assert.equal(monthKey(d), "2026-07");
+});
+
+test("monthKey returns null for invalid dates", () => {
+  assert.equal(monthKey(null), null);
+  assert.equal(monthKey(undefined), null);
+  assert.equal(monthKey(new Date("invalid")), null);
 });
