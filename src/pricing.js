@@ -52,16 +52,24 @@ export function loadPricing(customPath) {
   return pricing;
 }
 
+// Treat "." and "-" as the same so "claude-opus-5.5" matches the key "claude-opus-5-5".
+function normalizeModelId(value) {
+  return value.replaceAll(".", "-");
+}
+
 /**
  * Resolve the price entry for a model name using a substring match.
- * Vertex model IDs vary (e.g. "claude-sonnet-4@20250514"), so we match loosely.
- * Longest key wins so "claude-sonnet-4.5" is not priced as "claude-sonnet-4".
+ * Vertex model IDs vary (e.g. "claude-sonnet-4@20250514", "claude-opus-5-5"),
+ * so we match loosely and treat dots and hyphens as equivalent.
+ * Longest key wins so "claude-opus-5-5" is not priced as "claude-opus-5".
  */
 export function priceForModel(pricing, model = "") {
+  const normalizedModel = normalizeModelId(model);
   const keys = Object.keys(pricing)
     .filter((k) => !k.startsWith("_"))
-    .sort((a, b) => b.length - a.length);
-  const key = keys.find((k) => model.includes(k));
+    .sort((a, b) => normalizeModelId(b).length - normalizeModelId(a).length);
+  const key = keys.find((k) => normalizedModel.includes(normalizeModelId(k)));
+
   return key
     ? pricing[key]
     : {

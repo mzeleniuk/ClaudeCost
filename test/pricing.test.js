@@ -37,6 +37,19 @@ test("computes cost correctly", () => {
   assert.equal(cost, 18.0); // 3 + 15
 });
 
+test("prices hyphenated opus 5.5 separately from opus 5", () => {
+  const pricing = loadPricing();
+  const opus55 = priceForModel(pricing, "claude-opus-5-5");
+
+  assert.equal(opus55.input, 4);
+  assert.equal(opus55.output, 20);
+  assert.equal(opus55.cacheWrite, 5);
+  assert.equal(opus55.cacheWrite1h, 8);
+  assert.equal(opus55.cacheRead, 0.2);
+  assert.equal(priceForModel(pricing, "claude-opus-5.5").input, 4);
+  assert.equal(priceForModel(pricing, "claude-opus-5").input, 5);
+});
+
 test("prefers longest matching key regardless of key order", () => {
   const pricing = {
     "claude-sonnet-4": {
@@ -46,7 +59,7 @@ test("prefers longest matching key regardless of key order", () => {
       input: 1.0,
       output: 1.0,
     },
-    "claude-sonnet-4.5": {
+    "claude-sonnet-4-5": {
       cacheRead: 0,
       cacheWrite: 0,
       cacheWrite1h: 0,
