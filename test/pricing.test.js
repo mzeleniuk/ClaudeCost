@@ -37,6 +37,26 @@ test("computes cost correctly", () => {
   assert.equal(cost, 18.0); // 3 + 15
 });
 
+test("prices hyphenated sonnet 5.5 separately from sonnet 5", () => {
+  const pricing = loadPricing();
+  const sonnet55 = priceForModel(pricing, "claude-sonnet-5-5");
+
+  assert.equal(sonnet55, pricing["claude-sonnet-5-5"]);
+  assert.equal(sonnet55.input, 2);
+  assert.equal(sonnet55.output, 10);
+  assert.equal(sonnet55.cacheWrite, 2.5);
+  assert.equal(sonnet55.cacheWrite1h, 4);
+  assert.equal(sonnet55.cacheRead, 0.2);
+  assert.equal(
+    priceForModel(pricing, "claude-sonnet-5.5@20260928"),
+    pricing["claude-sonnet-5-5"],
+  );
+  assert.equal(
+    priceForModel(pricing, "claude-sonnet-5@20260630"),
+    pricing["claude-sonnet-5"],
+  );
+});
+
 test("prices hyphenated opus 5.5 separately from opus 5", () => {
   const pricing = loadPricing();
   const opus55 = priceForModel(pricing, "claude-opus-5-5");

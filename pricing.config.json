@@ -1,5 +1,12 @@
 {
-  "_comment": "USD per 1,000,000 tokens. Global region, <=200K input context. cacheWrite = 5m cache write (~1.25x input), cacheWrite1h = 1h cache write (~2x input), cacheRead = cache hit. Source: https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing#claude-models. claude-sonnet-5 uses promotional pricing through 2026-08-31. Verify against your Vertex AI region and GCP Billing.",
+  "_comment": "USD per 1,000,000 tokens. Global endpoint, <=200K input context. cacheWrite = 5m cache write (~1.25x input), cacheWrite1h = 1h cache write (~2x input), cacheRead = cache hit. Source: https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing. US and Europe multi-region rates are 1.1x these prices. Verify against your Vertex AI region and GCP Billing.",
+  "claude-sonnet-5-5": {
+    "input": 2.0,
+    "output": 10.0,
+    "cacheWrite": 2.5,
+    "cacheWrite1h": 4.0,
+    "cacheRead": 0.2
+  },
   "claude-sonnet-5": {
     "input": 2.0,
     "output": 10.0,
