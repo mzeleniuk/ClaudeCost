@@ -46,7 +46,7 @@ test("prices hyphenated sonnet 5.5 separately from sonnet 5", () => {
   assert.equal(sonnet55.output, 10);
   assert.equal(sonnet55.cacheWrite, 2.5);
   assert.equal(sonnet55.cacheWrite1h, 4);
-  assert.equal(sonnet55.cacheRead, 0.2);
+  assert.equal(sonnet55.cacheRead, 0.1);
   assert.equal(
     priceForModel(pricing, "claude-sonnet-5.5@20260928"),
     pricing["claude-sonnet-5-5"],
@@ -54,6 +54,26 @@ test("prices hyphenated sonnet 5.5 separately from sonnet 5", () => {
   assert.equal(
     priceForModel(pricing, "claude-sonnet-5@20260630"),
     pricing["claude-sonnet-5"],
+  );
+});
+
+test("prices hyphenated haiku 5.5 separately from haiku 4.5", () => {
+  const pricing = loadPricing();
+  const haiku55 = priceForModel(pricing, "claude-haiku-5-5");
+
+  assert.equal(haiku55, pricing["claude-haiku-5-5"]);
+  assert.equal(haiku55.input, 0.1);
+  assert.equal(haiku55.output, 0.5);
+  assert.equal(haiku55.cacheWrite, 0.125);
+  assert.equal(haiku55.cacheWrite1h, 0.2);
+  assert.equal(haiku55.cacheRead, 0.01);
+  assert.equal(
+    priceForModel(pricing, "claude-haiku-5.5@20261007"),
+    pricing["claude-haiku-5-5"],
+  );
+  assert.equal(
+    priceForModel(pricing, "claude-haiku-4-5@20251015").input,
+    1,
   );
 });
 

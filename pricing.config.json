@@ -1,11 +1,11 @@
 {
-  "_comment": "USD per 1,000,000 tokens. Global endpoint, <=200K input context. cacheWrite = 5m cache write (~1.25x input), cacheWrite1h = 1h cache write (~2x input), cacheRead = cache hit. Source: https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing. US and Europe multi-region rates are 1.1x these prices. Verify against your Vertex AI region and GCP Billing.",
+  "_comment": "USD per 1,000,000 tokens. Global endpoint, short-context tier (<=200K input tokens; claude-haiku-5-5 uses the <=100K tier, and prompts over 100K are 5x). cacheWrite = 5m cache write (~1.25x input), cacheWrite1h = 1h cache write (~2x input), cacheRead = cache hit. Source: https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing. US and Europe multi-region rates are 1.1x these prices. Verify against your Vertex AI region and GCP Billing.",
   "claude-sonnet-5-5": {
     "input": 2.0,
     "output": 10.0,
     "cacheWrite": 2.5,
     "cacheWrite1h": 4.0,
-    "cacheRead": 0.2
+    "cacheRead": 0.1
   },
   "claude-sonnet-5": {
     "input": 2.0,
@@ -13,6 +13,13 @@
     "cacheWrite": 2.5,
     "cacheWrite1h": 4.0,
     "cacheRead": 0.2
+  },
+  "claude-haiku-5-5": {
+    "input": 0.1,
+    "output": 0.5,
+    "cacheWrite": 0.125,
+    "cacheWrite1h": 0.2,
+    "cacheRead": 0.01
   },
   "claude-fable-5": {
     "input": 10.0,
