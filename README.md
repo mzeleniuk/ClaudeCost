@@ -2,7 +2,7 @@
 
 Approximate local cost tracking for [Claude Code](https://code.claude.com/docs) when billed through **Google Vertex AI**. It parses your local session transcripts and estimates spend — no proxy, no network calls.
 
-By default it merges transcripts from `~/.config/claude/projects` and `~/.claude/projects` (modern path first). Pass `--dir` to scan a single custom location.
+By default it merges transcripts from `~/.config/claude/projects` and `~/.claude/projects` (modern path first). Pass `--dir` to scan a single custom location. If `profiles.config.json` is present, each configured profile is reported separately.
 
 > ⚠️ **Approximate.** Prices vary by region and negotiated rates. Always reconcile against your GCP Billing export for authoritative numbers.
 
@@ -56,18 +56,39 @@ claude-cost --pricing ./my-prices.json
 
 ## Flags
 
-| Flag         | Description                                       |
-| ------------ | ------------------------------------------------- |
-| `--since`    | `7d`, `24h`, `90m`, `2w`, `today`, or an ISO date |
-| `--monthly`  | Since the start of the current month (local time) |
-| `--by-month` | Per-month, per-model breakdown across all history |
-| `--by-model` | Break totals down per model                       |
-| `--json`     | Output JSON instead of a table                    |
-| `--dir`      | Override transcript directory                     |
-| `--pricing`  | Path to a custom pricing JSON                     |
-| `-h, --help` | Show help                                         |
+| Flag         | Description                                                    |
+| ------------ | -------------------------------------------------------------- |
+| `--since`    | `7d`, `24h`, `90m`, `2w`, `today`, or an ISO date              |
+| `--monthly`  | Since the start of the current month (local time)              |
+| `--by-month` | Per-month, per-model breakdown across all history              |
+| `--by-model` | Break totals down per model                                    |
+| `--json`     | Output JSON instead of a table                                 |
+| `--dir`      | Override transcript directory. Ignores `profiles.config.json`. |
+| `--pricing`  | Path to a custom pricing JSON. Overrides per-profile pricing.  |
+| `-h, --help` | Show help                                                      |
 
 `--monthly` filters to the current month only. `--by-month` shows every month in your transcripts, each with a per-model breakdown.
+
+## Profiles
+
+To track more than one Claude Code account, copy `profiles.config.example.json` to `profiles.config.json` and list each account. `profiles.config.json` is local and is not committed.
+
+```json
+{
+  "profiles": [
+    { "name": "vertex", "dir": "~/.claude" },
+    {
+      "name": "work",
+      "dir": "~/.claude-work",
+      "pricing": "./pricing.work.json"
+    }
+  ]
+}
+```
+
+`dir` is that account’s Claude config directory (`CLAUDE_CONFIG_DIR`). Transcripts are read from `<dir>/projects`. Each profile is calculated the same way as a single run. The table prints one section per profile, then a total across all of them. `--json` wraps those sections in a `profiles` array plus the same summed total. With no `profiles.config.json`, `--json` stays a single report.
+
+`pricing` is optional. When it is omitted, the profile uses `--pricing` if you passed it, otherwise `pricing.config.json`. `--pricing` overrides every profile. `--dir` skips the profile file and scans one directory.
 
 ## Pricing
 

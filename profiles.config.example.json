@@ -1,0 +1,14 @@
+{
+  "profiles": [
+    {
+      "name": "vertex",
+      "dir": "~/.claude",
+      "pricing": "./pricing.config.json"
+    },
+    {
+      "name": "work",
+      "dir": "~/.claude-work",
+      "pricing": "./pricing.work.json"
+    }
+  ]
+}

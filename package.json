@@ -1,6 +1,6 @@
 {
   "name": "claude-cost",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Approximate local cost tracking for Claude Code (Vertex AI) by parsing session transcripts.",
   "type": "module",
   "license": "MIT",
@@ -12,9 +12,10 @@
   },
   "files": [
     "bin",
-    "src",
     "pricing.config.json",
-    "README.md"
+    "profiles.config.example.json",
+    "README.md",
+    "src"
   ],
   "scripts": {
     "history": "node bin/claude-cost.js --by-month",

@@ -1,13 +1,18 @@
 import { formatLocalDateTime } from "../since.js";
 
-const fmtUSD = (n) => `$${n.toFixed(4)}`;
+export const fmtUSD = (n) => `$${n.toFixed(4)}`;
 const fmtNum = (n) => n.toLocaleString("en-US");
+
+export const RECONCILE_NOTE =
+  "Note: approximate. Reconcile with your GCP Billing export.";
 
 export function renderTable(
   { groups, total, unknownModels },
-  { byModel, since },
+  { byModel, since, title, showNote = true },
 ) {
   const lines = [];
+
+  if (title) console.log(`\n======== ${title} ========`);
 
   if (byModel) {
     const rows = {};
@@ -49,7 +54,10 @@ export function renderTable(
     for (const m of unknownModels) lines.push(`   - ${m}`);
   }
 
-  lines.push("");
-  lines.push("Note: approximate. Reconcile with your GCP Billing export.");
+  if (showNote) {
+    lines.push("");
+    lines.push(RECONCILE_NOTE);
+  }
+
   console.log(lines.join("\n"));
 }

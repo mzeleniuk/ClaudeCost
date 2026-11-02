@@ -1,7 +1,7 @@
 import { sortedMonthKeys } from "../aggregateByMonth.js";
 import { formatLocalDateTime } from "../since.js";
+import { fmtUSD, RECONCILE_NOTE } from "./table.js";
 
-const fmtUSD = (n) => `$${n.toFixed(4)}`;
 const fmtNum = (n) => n.toLocaleString("en-US");
 
 function modelRows(models) {
@@ -23,9 +23,11 @@ function modelRows(models) {
 
 export function renderMonthlyTable(
   { months, total, unknownModels, skippedUndated },
-  { since },
+  { since, title, showNote = true },
 ) {
   const lines = [];
+
+  if (title) console.log(`\n======== ${title} ========`);
 
   for (const key of sortedMonthKeys(months)) {
     const month = months.get(key);
@@ -58,8 +60,10 @@ export function renderMonthlyTable(
     for (const m of unknownModels) lines.push(`   - ${m}`);
   }
 
-  lines.push("");
-  lines.push("Note: approximate. Reconcile with your GCP Billing export.");
+  if (showNote) {
+    lines.push("");
+    lines.push(RECONCILE_NOTE);
+  }
 
   console.log(lines.join("\n"));
 }
