@@ -21,9 +21,10 @@ function buildProfilesUsage(reports, { byModel, since }) {
     generatedAt: new Date().toISOString(),
     since: since ? since.toISOString() : null,
     groupedBy: byModel ? "model" : "none",
-    profiles: reports.map(({ profile, result }) => ({
+    profiles: reports.map(({ profile, region, result }) => ({
       name: profile.name,
       dir: profile.dir,
+      region,
       ...buildUsageProfile(result, { byModel }),
     })),
     total: sumBuckets(reports.map((report) => report.result.total)),
@@ -35,9 +36,10 @@ function buildProfilesMonthly(reports, since) {
     generatedAt: new Date().toISOString(),
     groupedBy: "month-model",
     since: since ? since.toISOString() : null,
-    profiles: reports.map(({ profile, result }) => ({
+    profiles: reports.map(({ profile, region, result }) => ({
       name: profile.name,
       dir: profile.dir,
+      region,
       ...buildMonthlyProfile(result),
     })),
     skippedUndated: reports.reduce(
@@ -65,13 +67,13 @@ export function renderProfileReports(
     return;
   }
 
-  for (const { profile, result } of reports) {
+  for (const { profile, region, result } of reports) {
     const title = `${profile.name} (${profile.configuredDir})`;
 
     if (byMonth) {
-      renderMonthlyTable(result, { since, title, showNote: false });
+      renderMonthlyTable(result, { since, title, region, showNote: false });
     } else {
-      renderTable(result, { byModel, since, title, showNote: false });
+      renderTable(result, { byModel, since, title, region, showNote: false });
     }
   }
 

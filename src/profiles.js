@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { expandHome } from "./config.js";
+import { validateRegion } from "./regions.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -25,7 +26,7 @@ function resolveUserPath(value, configFilePath) {
  * the default. `dir` is a Claude config directory; transcripts are in `projects`.
  *
  * @param {string} [filePath]
- * @returns {Array<{ name: string, dir: string, configuredDir: string, projectsDir: string, pricing: string|null }>|null}
+ * @returns {Array<{ name: string, dir: string, configuredDir: string, projectsDir: string, pricing: string|null, region: string|null }>|null}
  */
 export function loadProfiles(filePath = DEFAULT_PROFILES_PATH) {
   if (!fs.existsSync(filePath)) return null;
@@ -122,12 +123,23 @@ export function loadProfiles(filePath = DEFAULT_PROFILES_PATH) {
       }
     }
 
+    let region = null;
+
+    if (entry.region != null) {
+      if (typeof entry.region !== "string") {
+        throw new Error(`invalid profile "${name}": region must be a string`);
+      }
+
+      region = validateRegion(entry.region, `profile "${name}"`);
+    }
+
     loaded.push({
       name,
       dir,
       configuredDir,
       projectsDir,
       pricing,
+      region,
     });
   }
 

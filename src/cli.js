@@ -6,6 +6,8 @@ import { dedupeEvents } from "./dedupe.js";
 import { findTranscripts, readUsageEvents } from "./parse.js";
 import { loadPricing } from "./pricing.js";
 import { loadProfiles } from "./profiles.js";
+import { REGIONS, validateRegion } from "./regions.js";
+import { loadSettings } from "./settings.js";
 import { parseSince, startOfMonth } from "./since.js";
 import { resolveTranscriptDirs } from "./config.js";
 import { renderJson } from "./report/json.js";
@@ -31,7 +33,15 @@ OPTIONS
                       Ignores profiles.config.json.
   --pricing <path>    Use a custom pricing JSON file.
                       Overrides any per-profile pricing file.
+  --region <name>     Vertex AI endpoint you call. Non-global endpoints
+                      cost 10% more. Overrides the region in
+                      settings.config.json and in profiles.
+                      ${REGIONS.join(", ")}
   -h, --help          Show this help.
+
+SETTINGS
+  settings.config.json next to this program sets defaults. Copy
+  settings.config.example.json to get started. "region" defaults to global.
 
 PROFILES
   If profiles.config.json exists next to this program, each listed Claude
@@ -44,6 +54,7 @@ EXAMPLES
   claude-cost --by-month
   claude-cost --by-month --since 2025-01-01 --json
   claude-cost --dir ~/.claude/projects --pricing ./my-prices.json
+  claude-cost --region us --by-model
   claude-cost --monthly --by-model
   claude-cost --since 7d --by-model
   claude-cost --since today --json
@@ -69,15 +80,16 @@ async function collectReport(dirs, { pricing, since, byModel, byMonth }) {
   return aggregate(deduped, { pricing, since, byModel });
 }
 
-function renderSingle(result, { byMonth, byModel, since, json }) {
+function renderSingle(result, { byMonth, byModel, since, region, json }) {
   if (byMonth) {
-    const opts = { since };
+    const opts = { since, region };
     if (json) renderMonthlyJson(result, opts);
     else renderMonthlyTable(result, opts);
     return;
   }
 
-  const opts = { byModel, since };
+  const opts = { byModel, since, region };
+
   if (json) renderJson(result, opts);
   else renderTable(result, opts);
 }
@@ -93,6 +105,7 @@ export async function run(argv) {
       json: { type: "boolean", default: false },
       monthly: { type: "boolean", default: false },
       pricing: { type: "string" },
+      region: { type: "string" },
       since: { type: "string" },
     },
     allowPositionals: false,
@@ -114,13 +127,18 @@ export async function run(argv) {
   const byModel = values["by-model"];
   const byMonth = values["by-month"];
   const since = values.monthly ? startOfMonth() : parseSince(values.since);
+  const regionFlag =
+    values.region != null ? validateRegion(values.region, "--region") : null;
+  const settings = loadSettings();
   const profiles = values.dir ? null : loadProfiles();
 
   if (profiles) {
     const reports = [];
     for (const profile of profiles) {
+      const region = regionFlag || profile.region || settings.region;
       const pricing = loadPricing(
         values.pricing || profile.pricing || undefined,
+        region,
       );
 
       const result = await collectReport([profile.projectsDir], {
@@ -130,7 +148,7 @@ export async function run(argv) {
         byMonth,
       });
 
-      reports.push({ profile, result });
+      reports.push({ profile, region, result });
     }
 
     renderProfileReports(reports, {
@@ -143,8 +161,9 @@ export async function run(argv) {
     return;
   }
 
+  const region = regionFlag || settings.region;
   const dirs = resolveTranscriptDirs(values.dir);
-  const pricing = loadPricing(values.pricing);
+  const pricing = loadPricing(values.pricing, region);
   const result = await collectReport(dirs, {
     pricing,
     since,
@@ -156,6 +175,7 @@ export async function run(argv) {
     byMonth,
     byModel,
     since,
+    region,
     json: values.json,
   });
 }

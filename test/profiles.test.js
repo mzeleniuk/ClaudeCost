@@ -104,3 +104,25 @@ test("loadProfiles resolves an optional pricing path", () => {
   const profiles = loadProfiles(file);
   assert.equal(profiles[0].pricing, pricing);
 });
+
+test("loadProfiles reads an optional region and rejects unknown ones", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-profiles-"));
+  const file = writeProfiles(root, {
+    profiles: [
+      { name: "vertex", dir: fixture },
+      { name: "work", dir: fixture, region: "eu" },
+    ],
+  });
+
+  const profiles = loadProfiles(file);
+  assert.equal(profiles[0].region, null);
+  assert.equal(profiles[1].region, "eu");
+
+  writeProfiles(root, {
+    profiles: [{ name: "work", dir: fixture, region: "mars" }],
+  });
+  assert.throws(
+    () => loadProfiles(file),
+    /unknown region "mars" in profile "work"/,
+  );
+});

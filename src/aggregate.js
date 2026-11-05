@@ -23,6 +23,7 @@ export async function aggregate(
   });
 
   const groups = new Map(); // key -> bucket
+  const notInRegion = new Set();
   const total = zero();
   const unknownModels = new Set();
 
@@ -30,7 +31,9 @@ export async function aggregate(
     if (since && (!ev.ts || ev.ts < since)) continue;
 
     const price = priceForModel(pricing, ev.model);
+
     if (price._unknown) unknownModels.add(ev.model);
+    if (price._notInRegion) notInRegion.add(ev.model);
 
     const cost = computeCost(price, ev.usage);
     const key = byModel ? ev.model : "__all__";
@@ -56,6 +59,7 @@ export async function aggregate(
 
   return {
     groups,
+    notInRegion: [...notInRegion],
     total,
     unknownModels: [...unknownModels].filter((m) => m && m !== "unknown"),
   };

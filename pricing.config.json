@@ -1,5 +1,5 @@
 {
-  "_comment": "USD per 1,000,000 tokens. Global endpoint, short-context tier (<=200K input tokens; claude-haiku-5-5 uses the <=100K tier, and prompts over 100K are 5x). cacheWrite = 5m cache write (~1.25x input), cacheWrite1h = 1h cache write (~2x input), cacheRead = cache hit. Source: https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing. US and Europe multi-region rates are 1.1x these prices. Verify against your Vertex AI region and GCP Billing.",
+  "_comment": "USD per 1,000,000 tokens. Global endpoint. Claude 4.6 and later models charge the same rate across the full context window. longContext holds the rates used when a request's prompt (input + cache read + cache write tokens) is over threshold; every token in that request is billed at those rates. cacheWrite = 5m cache write (~1.25x input), cacheWrite1h = 1h cache write (~2x input), cacheRead = cache hit. Source: https://cloud.google.com/model-garden/partner-models/pricing (checked 2026-11-05). Other endpoints cost 1.1x these prices; set region in settings.config.json or pass --region. Verify against GCP Billing.",
   "claude-sonnet-5-5": {
     "input": 2.0,
     "output": 10.0,
@@ -19,7 +19,22 @@
     "output": 0.5,
     "cacheWrite": 0.125,
     "cacheWrite1h": 0.2,
-    "cacheRead": 0.01
+    "cacheRead": 0.01,
+    "longContext": {
+      "threshold": 100000,
+      "input": 0.5,
+      "output": 2.5,
+      "cacheWrite": 0.625,
+      "cacheWrite1h": 1.0,
+      "cacheRead": 0.05
+    }
+  },
+  "claude-fable-5-1": {
+    "input": 10.0,
+    "output": 50.0,
+    "cacheWrite": 12.5,
+    "cacheWrite1h": 20.0,
+    "cacheRead": 0.25
   },
   "claude-fable-5": {
     "input": 10.0,
@@ -82,7 +97,15 @@
     "output": 15.0,
     "cacheWrite": 3.75,
     "cacheWrite1h": 6.0,
-    "cacheRead": 0.3
+    "cacheRead": 0.3,
+    "longContext": {
+      "threshold": 200000,
+      "input": 6.0,
+      "output": 22.5,
+      "cacheWrite": 7.5,
+      "cacheWrite1h": 12.0,
+      "cacheRead": 0.6
+    }
   },
   "claude-haiku-4-5": {
     "input": 1.0,
@@ -90,47 +113,5 @@
     "cacheWrite": 1.25,
     "cacheWrite1h": 2.0,
     "cacheRead": 0.1
-  },
-  "claude-opus-4-1": {
-    "input": 15.0,
-    "output": 75.0,
-    "cacheWrite": 18.75,
-    "cacheWrite1h": 30.0,
-    "cacheRead": 1.5
-  },
-  "claude-opus-4": {
-    "input": 15.0,
-    "output": 75.0,
-    "cacheWrite": 18.75,
-    "cacheWrite1h": 30.0,
-    "cacheRead": 1.5
-  },
-  "claude-3-7-sonnet": {
-    "input": 3.0,
-    "output": 15.0,
-    "cacheWrite": 3.75,
-    "cacheWrite1h": 6.0,
-    "cacheRead": 0.3
-  },
-  "claude-sonnet-4": {
-    "input": 3.0,
-    "output": 15.0,
-    "cacheWrite": 3.75,
-    "cacheWrite1h": 6.0,
-    "cacheRead": 0.3
-  },
-  "claude-3-5-haiku": {
-    "input": 0.8,
-    "output": 4.0,
-    "cacheWrite": 1.0,
-    "cacheWrite1h": 1.6,
-    "cacheRead": 0.08
-  },
-  "claude-3-haiku": {
-    "input": 0.25,
-    "output": 1.25,
-    "cacheWrite": 0.3,
-    "cacheWrite1h": 0.5,
-    "cacheRead": 0.03
   }
 }

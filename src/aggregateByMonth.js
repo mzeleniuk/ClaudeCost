@@ -29,6 +29,7 @@ function accumulate(bucket, usage, cost) {
  */
 export async function aggregateByMonth(events, { pricing, since = null }) {
   const months = new Map();
+  const notInRegion = new Set();
   const total = zero();
   const unknownModels = new Set();
   let skippedUndated = 0;
@@ -49,7 +50,9 @@ export async function aggregateByMonth(events, { pricing, since = null }) {
     }
 
     const price = priceForModel(pricing, ev.model);
+
     if (price._unknown) unknownModels.add(ev.model);
+    if (price._notInRegion) notInRegion.add(ev.model);
 
     const cost = computeCost(price, ev.usage);
 
@@ -72,6 +75,7 @@ export async function aggregateByMonth(events, { pricing, since = null }) {
 
   return {
     months,
+    notInRegion: [...notInRegion],
     skippedUndated,
     total,
     unknownModels: [...unknownModels].filter((m) => m && m !== "unknown"),

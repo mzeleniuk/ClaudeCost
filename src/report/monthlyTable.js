@@ -1,6 +1,6 @@
 import { sortedMonthKeys } from "../aggregateByMonth.js";
 import { formatLocalDateTime } from "../since.js";
-import { fmtUSD, RECONCILE_NOTE } from "./table.js";
+import { fmtUSD, RECONCILE_NOTE, regionLines, warningLines } from "./table.js";
 
 const fmtNum = (n) => n.toLocaleString("en-US");
 
@@ -22,9 +22,10 @@ function modelRows(models) {
 }
 
 export function renderMonthlyTable(
-  { months, total, unknownModels, skippedUndated },
-  { since, title, showNote = true },
+  result,
+  { since, title, region, showNote = true },
 ) {
+  const { months, total, skippedUndated } = result;
   const lines = [];
 
   if (title) console.log(`\n======== ${title} ========`);
@@ -40,6 +41,7 @@ export function renderMonthlyTable(
   }
 
   if (since) lines.push(`Since: ${formatLocalDateTime(since)} (local)`);
+  lines.push(...regionLines(region));
 
   lines.push(
     `\nGrand total: ${fmtUSD(total.costUSD)}  (${total.messages} messages)`,
@@ -51,14 +53,7 @@ export function renderMonthlyTable(
     );
   }
 
-  if (unknownModels.length) {
-    lines.push("");
-    lines.push(
-      "⚠ Unknown models (priced at $0 — add them to pricing.config.json):",
-    );
-
-    for (const m of unknownModels) lines.push(`   - ${m}`);
-  }
+  lines.push(...warningLines(result, region));
 
   if (showNote) {
     lines.push("");

@@ -44,6 +44,7 @@ claude-cost --by-model              # per-model breakdown
 claude-cost --json                  # machine-readable output
 claude-cost --dir ~/.claude/projects
 claude-cost --pricing ./my-prices.json
+claude-cost --region us             # price at the US multi-region endpoint
 ```
 
 ## Flags
@@ -57,9 +58,22 @@ claude-cost --pricing ./my-prices.json
 | `--json`     | Output JSON instead of a table                                 |
 | `--dir`      | Override transcript directory. Ignores `profiles.config.json`. |
 | `--pricing`  | Path to a custom pricing JSON. Overrides per-profile pricing.  |
+| `--region`   | Vertex AI endpoint you call. Overrides every other setting.    |
 | `-h, --help` | Show help                                                      |
 
 `--monthly` filters to the current month only. `--by-month` shows every month in your transcripts, each with a per-model breakdown.
+
+## Region
+
+Vertex AI charges by endpoint. The global endpoint gets list price. The `us` and `eu` multi-region endpoints and the single-region endpoints cost 10% more, on every rate including long-context rates. The default is `global`. To change it, copy `settings.config.example.json` to `settings.config.json` and set `region`:
+
+```json
+{ "region": "us" }
+```
+
+`settings.config.json` is local and is not committed. A profile can set its own `region`, and `--region` overrides both. Accepted values are `global`, `us`, `eu`, `us-east5`, `europe-west1`, `asia-southeast1` and `asia-east1`. These are the same location names Claude Code reads from `CLOUD_ML_REGION`.
+
+Each endpoint offers a different set of models. `us-east5` has no Claude 5 models, for example. If your transcripts use a model that Vertex does not list at your endpoint, the report still prices it at that endpoint's rates and lists it under "Not offered at the ... endpoint". That warning usually means the region setting is wrong.
 
 ## Profiles
 
@@ -80,11 +94,25 @@ To track more than one Claude Code account, copy `profiles.config.example.json` 
 
 `dir` is that account’s Claude config directory (`CLAUDE_CONFIG_DIR`). Transcripts are read from `<dir>/projects`. Each profile is calculated the same way as a single run. The table prints one section per profile, then a total across all of them. `--json` wraps those sections in a `profiles` array plus the same summed total. With no `profiles.config.json`, `--json` stays a single report.
 
-`pricing` is optional. When it is omitted, the profile uses `--pricing` if you passed it, otherwise `pricing.config.json`. `--pricing` overrides every profile. `--dir` skips the profile file and scans one directory.
+`pricing` is optional. When it is omitted, the profile uses `--pricing` if you passed it, otherwise `pricing.config.json`. `--pricing` overrides every profile. `region` is optional too and falls back to `settings.config.json`. `--dir` skips the profile file and scans one directory.
 
 ## Pricing
 
-Edit `pricing.config.json` (USD per 1,000,000 tokens). Fields: `input`, `output`, `cacheWrite` (5-minute cache write), `cacheWrite1h` (1-hour cache write), `cacheRead`. Model names are matched by substring, so `claude-sonnet-4` matches `claude-sonnet-4@20250514`.
+Edit `pricing.config.json` (USD per 1,000,000 tokens at the global endpoint; see [Region](#region) for the others). It lists the Claude models Vertex AI currently prices. Older models such as Claude Sonnet 4, Opus 4.1 and the 3.x family are left out, so their usage is reported as unknown and priced at $0. Fields: `input`, `output`, `cacheWrite` (5-minute cache write), `cacheWrite1h` (1-hour cache write), `cacheRead`.
+
+A key matches any model ID that contains it and ends on a version boundary. `claude-sonnet-4-5` matches `claude-sonnet-4-5@20250929` and `claude-sonnet-4-5-20250929`. It does not match `claude-sonnet-4-7`, which shows up under unknown models until you add it. The longest matching key wins, and dots count as hyphens, so `claude-opus-5.5` uses `claude-opus-5-5`.
+
+Some models charge more for long prompts. Add a `longContext` object with a `threshold` and the same five rate fields. When a request's prompt (input, cache read and cache write tokens together) is over `threshold`, every token in that request uses the `longContext` rates:
+
+```json
+"claude-haiku-5-5": {
+  "input": 0.1, "output": 0.5, "cacheWrite": 0.125, "cacheWrite1h": 0.2, "cacheRead": 0.01,
+  "longContext": {
+    "threshold": 100000,
+    "input": 0.5, "output": 2.5, "cacheWrite": 0.625, "cacheWrite1h": 1.0, "cacheRead": 0.05
+  }
+}
+```
 
 ## Development
 

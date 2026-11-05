@@ -1,6 +1,6 @@
 {
   "name": "claude-cost",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "private": true,
   "description": "Approximate local cost tracking for Claude Code (Vertex AI) by parsing session transcripts.",
   "type": "module",
@@ -16,6 +16,7 @@
     "pricing.config.json",
     "profiles.config.example.json",
     "README.md",
+    "settings.config.example.json",
     "src"
   ],
   "scripts": {

@@ -1,5 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { priceForModel, computeCost, loadPricing } from "../src/pricing.js";
@@ -71,10 +74,7 @@ test("prices hyphenated haiku 5.5 separately from haiku 4.5", () => {
     priceForModel(pricing, "claude-haiku-5.5@20261007"),
     pricing["claude-haiku-5-5"],
   );
-  assert.equal(
-    priceForModel(pricing, "claude-haiku-4-5@20251015").input,
-    1,
-  );
+  assert.equal(priceForModel(pricing, "claude-haiku-4-5@20251015").input, 1);
 });
 
 test("prices hyphenated opus 5.5 separately from opus 5", () => {
@@ -143,4 +143,120 @@ test("breakdown prices 5m and 1h separately", () => {
     output: 0,
   });
   assert.equal(cost, 9.75); // 3.75 + 6.0
+});
+
+test("does not price an unlisted version as an older key", () => {
+  const pricing = loadPricing();
+
+  assert.equal(priceForModel(pricing, "claude-opus-4-9")._unknown, true);
+  assert.equal(
+    priceForModel(pricing, "claude-sonnet-5-6@20261001")._unknown,
+    true,
+  );
+  assert.equal(priceForModel(pricing, "claude-opus-4-10")._unknown, true);
+  assert.equal(
+    priceForModel(pricing, "claude-opus-4-1@20250805")._unknown,
+    true,
+  );
+  assert.equal(
+    priceForModel(pricing, "claude-3-7-sonnet@20250219")._unknown,
+    true,
+  );
+});
+
+test("matches dated, Bedrock and context-suffixed model IDs", () => {
+  const pricing = loadPricing();
+  const cases = [
+    ["claude-opus-4-5-20251101", "claude-opus-4-5"],
+    ["claude-opus-4-5@20251101", "claude-opus-4-5"],
+    ["us.anthropic.claude-sonnet-4-5-20250929-v1:0", "claude-sonnet-4-5"],
+    ["claude-sonnet-4-5[1m]", "claude-sonnet-4-5"],
+    ["claude-haiku-4-5@20251001", "claude-haiku-4-5"],
+    ["claude-fable-5-1", "claude-fable-5-1"],
+    ["claude-fable-5", "claude-fable-5"],
+  ];
+
+  for (const [model, key] of cases) {
+    assert.equal(priceForModel(pricing, model), pricing[key], model);
+  }
+});
+
+const haikuUsage = (input, cacheRead) => ({
+  cacheRead,
+  cacheWrite: 0,
+  hasCacheBreakdown: false,
+  input,
+  output: 1_000_000,
+});
+
+test("haiku 5.5 prompts over 100K use long-context rates", () => {
+  const p = priceForModel(loadPricing(), "claude-haiku-5-5");
+
+  // 100,000 prompt tokens is still the short tier: 0.1 * 0.1 + 0.5
+  assert.equal(computeCost(p, haikuUsage(100_000, 0)), 0.51);
+  // 100,001 crosses it, and cache reads count toward the prompt:
+  // 1 * 0.5 + 100,000 * 0.05 + 1M * 2.5, per million
+  const cost = computeCost(p, haikuUsage(1, 100_000));
+  assert.ok(Math.abs(cost - 2.5050005) < 1e-12, String(cost));
+});
+
+test("sonnet 4.5 prompts over 200K use long-context rates", () => {
+  const p = priceForModel(loadPricing(), "claude-sonnet-4-5@20250929");
+  const cost = computeCost(p, {
+    cacheRead: 0,
+    cacheWrite: 1_000_000,
+    cacheWrite1h: 1_000_000,
+    cacheWrite5m: 0,
+    hasCacheBreakdown: true,
+    input: 0,
+    output: 0,
+  });
+
+  assert.equal(cost, 12.0);
+});
+
+test("models without a longContext tier keep one rate at any length", () => {
+  const p = priceForModel(loadPricing(), "claude-sonnet-5");
+  const cost = computeCost(p, {
+    cacheRead: 0,
+    cacheWrite: 0,
+    hasCacheBreakdown: false,
+    input: 1_000_000,
+    output: 0,
+  });
+
+  assert.equal(cost, 2.0);
+});
+
+test("loadPricing rejects an invalid longContext threshold", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-"));
+  const file = path.join(dir, "pricing.json");
+  const rates = {
+    input: 1,
+    output: 1,
+    cacheWrite: 1,
+    cacheWrite1h: 1,
+    cacheRead: 1,
+  };
+
+  try {
+    fs.writeFileSync(
+      file,
+      JSON.stringify({ m: { ...rates, longContext: { ...rates } } }),
+    );
+    assert.throws(() => loadPricing(file), /"threshold" must be a positive/);
+
+    fs.writeFileSync(
+      file,
+      JSON.stringify({
+        m: { ...rates, longContext: { threshold: 1000, input: 1 } },
+      }),
+    );
+    assert.throws(
+      () => loadPricing(file),
+      /longContext.*"output" must be a number/,
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

@@ -1,3 +1,4 @@
+import { DEFAULT_REGION, describeRegion } from "../regions.js";
 import { formatLocalDateTime } from "../since.js";
 
 export const fmtUSD = (n) => `$${n.toFixed(4)}`;
@@ -6,10 +7,42 @@ const fmtNum = (n) => n.toLocaleString("en-US");
 export const RECONCILE_NOTE =
   "Note: approximate. Reconcile with your GCP Billing export.";
 
+/** "Region: ..." line, or nothing for the default global endpoint. */
+export function regionLines(region) {
+  if (!region || region === DEFAULT_REGION) return [];
+  return [`Region: ${describeRegion(region)}`];
+}
+
+/** Warnings printed under a report's total. */
+export function warningLines({ unknownModels, notInRegion = [] }, region) {
+  const lines = [];
+
+  if (unknownModels.length) {
+    lines.push("");
+    lines.push(
+      "⚠ Unknown models (priced at $0 — add them to pricing.config.json):",
+    );
+
+    for (const m of unknownModels) lines.push(`   - ${m}`);
+  }
+
+  if (notInRegion.length) {
+    lines.push("");
+    lines.push(
+      `⚠ Not offered at the ${region} endpoint (priced at ${region} rates anyway, so check your region setting):`,
+    );
+
+    for (const m of notInRegion) lines.push(`   - ${m}`);
+  }
+
+  return lines;
+}
+
 export function renderTable(
-  { groups, total, unknownModels },
-  { byModel, since, title, showNote = true },
+  result,
+  { byModel, since, title, region, showNote = true },
 ) {
+  const { groups, total } = result;
   const lines = [];
 
   if (title) console.log(`\n======== ${title} ========`);
@@ -41,18 +74,13 @@ export function renderTable(
   lines.push("");
 
   if (since) lines.push(`Since:  ${formatLocalDateTime(since)} (local)`);
+  lines.push(...regionLines(region));
 
   lines.push(
     `Total estimated cost: ${fmtUSD(total.costUSD)}  (${total.messages} messages)`,
   );
 
-  if (unknownModels.length) {
-    lines.push("");
-    lines.push(
-      "⚠ Unknown models (priced at $0 — add them to pricing.config.json):",
-    );
-    for (const m of unknownModels) lines.push(`   - ${m}`);
-  }
+  lines.push(...warningLines(result, region));
 
   if (showNote) {
     lines.push("");
