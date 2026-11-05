@@ -8,9 +8,11 @@ By default it merges transcripts from `~/.config/claude/projects` and `~/.claude
 
 ## Install
 
+The package is not on npm yet, so run it from a local clone.
+
 ### Run without installing
 
-From a local clone (no `npm install` required):
+No `npm install` required:
 
 ```bash
 node bin/claude-cost.js --monthly
@@ -20,23 +22,13 @@ node bin/claude-cost.js --since 7d --by-model
 npm start -- --monthly
 ```
 
-From npm (no global install):
-
-```bash
-npx claude-cost --since 7d --by-model
-```
-
 ### Install globally
 
-```bash
-npm install -g claude-cost
-claude-cost --help
-```
-
-To install globally from a local clone:
+From the clone, install the `claude-cost` command:
 
 ```bash
 npm install -g .
+claude-cost --help
 ```
 
 ## Usage

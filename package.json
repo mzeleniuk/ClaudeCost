@@ -1,11 +1,12 @@
 {
   "name": "claude-cost",
-  "version": "0.3.0",
+  "version": "0.3.1",
+  "private": true,
   "description": "Approximate local cost tracking for Claude Code (Vertex AI) by parsing session transcripts.",
   "type": "module",
   "license": "MIT",
   "engines": {
-    "node": ">=20.12.2"
+    "node": ">=24.15.0"
   },
   "bin": {
     "claude-cost": "bin/claude-cost.js"
@@ -22,19 +23,19 @@
     "lint": "for f in bin/*.js src/*.js src/report/*.js; do node --check \"$f\"; done",
     "monthly": "node bin/claude-cost.js --monthly --by-model",
     "start": "node bin/claude-cost.js",
-    "test": "node --test test/"
+    "test": "node --test"
   },
   "keywords": [
-    "claude",
     "claude-code",
-    "vertex-ai",
+    "claude",
+    "cli",
     "cost",
     "tokens",
-    "cli"
+    "vertex-ai"
   ],
   "author": "Mykhailo Zeleniuk",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mzeleniuk/ClaudeCost.git"
+    "url": "git+https://github.com/mzeleniuk/ClaudeCost.git"
   }
 }
