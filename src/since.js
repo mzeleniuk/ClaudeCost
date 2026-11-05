@@ -2,7 +2,9 @@
  * Parse a --since value into a lower-bound Date (inclusive).
  * Supports:
  *   - Relative durations: "7d", "24h", "90m", "30s", "2w"
- *   - ISO dates: "2025-01-15", "2025-01-15T10:00:00Z"
+ *   - Dates: "2025-01-15" (local midnight)
+ *   - Date and time: "2025-01-15T10:00", "2025-01-15 10:00:30" (local), or
+ *     with an offset: "2025-01-15T10:00:00Z", "2025-01-15T10:00+02:00"
  *   - "today"
  * Returns null when input is undefined (meaning: no lower bound).
  */
@@ -35,6 +37,41 @@ export function startOfMonth(now = new Date()) {
   return d;
 }
 
+// YYYY-MM-DD, optionally followed by a time and an offset.
+const DATE_TIME =
+  /^(\d{4})-(\d{2})-(\d{2})(?:[t ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?(z|[+-]\d{2}:\d{2})?)?$/;
+
+const daysInMonth = (year, month) => new Date(year, month, 0).getDate();
+
+/** Build a Date from DATE_TIME parts, or null if a part is out of range. */
+function dateFromParts(match) {
+  const [, y, mo, d, h = "0", mi = "0", s = "0", ms = "0", offset] = match;
+  const [year, month, day, hour, minute, second] = [y, mo, d, h, mi, s].map(
+    Number,
+  );
+  const millis = Number(ms.padEnd(3, "0"));
+
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > daysInMonth(year, month)) return null;
+  if (hour > 23 || minute > 59 || second > 59) return null;
+
+  if (!offset) {
+    return new Date(year, month - 1, day, hour, minute, second, millis);
+  }
+
+  let offsetMinutes = 0;
+
+  if (offset !== "z") {
+    const sign = offset[0] === "-" ? -1 : 1;
+    const [oh, om] = offset.slice(1).split(":").map(Number);
+    if (oh > 23 || om > 59) return null;
+    offsetMinutes = sign * (oh * 60 + om);
+  }
+
+  const utc = Date.UTC(year, month - 1, day, hour, minute, second, millis);
+  return new Date(utc - offsetMinutes * 60_000);
+}
+
 export function parseSince(input, now = new Date()) {
   if (input == null) return null;
   const value = String(input).trim().toLowerCase();
@@ -52,10 +89,12 @@ export function parseSince(input, now = new Date()) {
     return new Date(now.getTime() - amount * UNIT_MS[unit]);
   }
 
-  const abs = new Date(input); // preserve original casing for ISO parsing
-  if (!Number.isNaN(abs.getTime())) return abs;
+  const abs = value.match(DATE_TIME);
+  const date = abs && dateFromParts(abs);
+
+  if (date) return date;
 
   throw new Error(
-    `invalid --since value: "${input}". Use e.g. 7d, 24h, today, or 2025-01-15.`,
+    `invalid --since value: "${input}". Use e.g. 7d, 24h, today, 2025-01-15, or 2025-01-15T10:00.`,
   );
 }

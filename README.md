@@ -2,7 +2,7 @@
 
 Approximate local cost tracking for [Claude Code](https://code.claude.com/docs) when billed through **Google Vertex AI**. It parses your local session transcripts and estimates spend — no proxy, no network calls.
 
-By default it merges transcripts from `~/.config/claude/projects` and `~/.claude/projects` (modern path first). Pass `--dir` to scan a single custom location. If `profiles.config.json` is present, each configured profile is reported separately.
+By default it merges transcripts from `~/.config/claude/projects` and `~/.claude/projects` (modern path first). If `CLAUDE_CONFIG_DIR` is set, it reads only `$CLAUDE_CONFIG_DIR/projects`, the same folder Claude Code uses. Pass `--dir` to scan a single custom location. If `profiles.config.json` is present, each configured profile is reported separately.
 
 > ⚠️ **Approximate.** Prices vary by region and negotiated rates. Always reconcile against your GCP Billing export for authoritative numbers.
 
@@ -37,7 +37,8 @@ claude-cost --help
 claude-cost                         # all-time total
 claude-cost --since 7d              # last 7 days
 claude-cost --since today           # since local midnight
-claude-cost --since 2025-01-01      # since a date
+claude-cost --since 2025-01-01      # since local midnight on a date
+claude-cost --since 2025-01-15T10:00  # since a local date and time
 claude-cost --monthly               # since start of current month
 claude-cost --by-month              # per-month, per-model history (all time)
 claude-cost --by-model              # per-model breakdown
@@ -51,17 +52,19 @@ claude-cost --region us             # price at the US multi-region endpoint
 
 | Flag         | Description                                                    |
 | ------------ | -------------------------------------------------------------- |
-| `--since`    | `7d`, `24h`, `90m`, `2w`, `today`, or an ISO date              |
+| `--since`    | `7d`, `24h`, `90m`, `2w`, `today`, or a date (see below)       |
 | `--monthly`  | Since the start of the current month (local time)              |
 | `--by-month` | Per-month, per-model breakdown across all history              |
-| `--by-model` | Break totals down per model                                    |
+| `--by-model` | Break totals down per model. Not with `--by-month`.            |
 | `--json`     | Output JSON instead of a table                                 |
 | `--dir`      | Override transcript directory. Ignores `profiles.config.json`. |
 | `--pricing`  | Path to a custom pricing JSON. Overrides per-profile pricing.  |
 | `--region`   | Vertex AI endpoint you call. Overrides every other setting.    |
 | `-h, --help` | Show help                                                      |
 
-`--monthly` filters to the current month only. `--by-month` shows every month in your transcripts, each with a per-model breakdown.
+`--monthly` filters to the current month only. `--by-month` shows every month in your transcripts, each with a per-model breakdown, so it can't be combined with `--by-model`.
+
+`--since` takes a date as `YYYY-MM-DD`, which means local midnight. Add a time as `YYYY-MM-DDTHH:MM`, with optional seconds, to start at that local time. Add `Z` or an offset such as `+02:00` to give the time in another zone. Anything else is rejected, including impossible dates such as `2025-02-30`.
 
 ## Region
 
@@ -92,7 +95,7 @@ To track more than one Claude Code account, copy `profiles.config.example.json` 
 }
 ```
 
-`dir` is that account’s Claude config directory (`CLAUDE_CONFIG_DIR`). Transcripts are read from `<dir>/projects`. Each profile is calculated the same way as a single run. The table prints one section per profile, then a total across all of them. `--json` wraps those sections in a `profiles` array plus the same summed total. With no `profiles.config.json`, `--json` stays a single report.
+`dir` is that account’s Claude config directory (`CLAUDE_CONFIG_DIR`). Transcripts are read from `<dir>/projects`. Each profile needs its own directory. Two profiles that resolve to the same `projects` folder, through a symlink for example, or where one sits inside the other, are rejected because their transcripts would be counted twice. Each profile is calculated the same way as a single run. The table prints one section per profile, then a total across all of them. `--json` wraps those sections in a `profiles` array plus the same summed total. With no `profiles.config.json`, `--json` stays a single report.
 
 `pricing` is optional. When it is omitted, the profile uses `--pricing` if you passed it, otherwise `pricing.config.json`. `--pricing` overrides every profile. `region` is optional too and falls back to `settings.config.json`. `--dir` skips the profile file and scans one directory.
 

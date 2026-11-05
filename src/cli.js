@@ -16,6 +16,9 @@ import { renderMonthlyTable } from "./report/monthlyTable.js";
 import { renderProfileReports } from "./report/profiles.js";
 import { renderTable } from "./report/table.js";
 
+// How reports name the bundled pricing file.
+const DEFAULT_PRICING_NAME = "pricing.config.json";
+
 const HELP = `
 claude-cost — approximate local cost tracking for Claude Code (Vertex AI)
 
@@ -24,10 +27,12 @@ USAGE
 
 OPTIONS
   --since <value>     Only include activity since this point.
-                      Relative: 7d, 24h, 90m, 2w  |  today  |  ISO: 2025-01-15
+                      Relative: 7d, 24h, 90m, 2w  |  today
+                      Date: 2025-01-15 (local midnight)
+                      Date and time: 2025-01-15T10:00 (local) or with Z/+02:00
   --monthly           Only include activity since the start of the current month.
   --by-month          Break down totals per month and per model (all history).
-  --by-model          Break down totals per model.
+  --by-model          Break down totals per model. Not needed with --by-month.
   --json              Output machine-readable JSON instead of a table.
   --dir <path>        Override the transcript directory to scan.
                       Ignores profiles.config.json.
@@ -47,7 +52,8 @@ PROFILES
   If profiles.config.json exists next to this program, each listed Claude
   config directory is calculated and printed separately. Copy
   profiles.config.example.json to get started. Without that file, transcripts
-  from the default Claude config directories are merged into one report.
+  from the default Claude config directories are merged into one report, or
+  only from CLAUDE_CONFIG_DIR when it is set.
 
 EXAMPLES
   claude-cost
@@ -80,15 +86,18 @@ async function collectReport(dirs, { pricing, since, byModel, byMonth }) {
   return aggregate(deduped, { pricing, since, byModel });
 }
 
-function renderSingle(result, { byMonth, byModel, since, region, json }) {
+function renderSingle(
+  result,
+  { byMonth, byModel, since, region, pricingFile, json },
+) {
   if (byMonth) {
-    const opts = { since, region };
+    const opts = { since, region, pricingFile };
     if (json) renderMonthlyJson(result, opts);
     else renderMonthlyTable(result, opts);
     return;
   }
 
-  const opts = { byModel, since, region };
+  const opts = { byModel, since, region, pricingFile };
 
   if (json) renderJson(result, opts);
   else renderTable(result, opts);
@@ -124,6 +133,12 @@ export async function run(argv) {
     throw new Error("use either --monthly or --by-month, not both.");
   }
 
+  if (values["by-model"] && values["by-month"]) {
+    throw new Error(
+      "use either --by-model or --by-month, not both. --by-month already breaks each month down per model.",
+    );
+  }
+
   const byModel = values["by-model"];
   const byMonth = values["by-month"];
   const since = values.monthly ? startOfMonth() : parseSince(values.since);
@@ -136,10 +151,8 @@ export async function run(argv) {
     const reports = [];
     for (const profile of profiles) {
       const region = regionFlag || profile.region || settings.region;
-      const pricing = loadPricing(
-        values.pricing || profile.pricing || undefined,
-        region,
-      );
+      const pricingPath = values.pricing || profile.pricing || undefined;
+      const pricing = loadPricing(pricingPath, region);
 
       const result = await collectReport([profile.projectsDir], {
         pricing,
@@ -148,7 +161,12 @@ export async function run(argv) {
         byMonth,
       });
 
-      reports.push({ profile, region, result });
+      reports.push({
+        pricingFile: pricingPath ?? DEFAULT_PRICING_NAME,
+        profile,
+        region,
+        result,
+      });
     }
 
     renderProfileReports(reports, {
@@ -172,10 +190,11 @@ export async function run(argv) {
   });
 
   renderSingle(result, {
-    byMonth,
     byModel,
-    since,
-    region,
+    byMonth,
     json: values.json,
+    pricingFile: values.pricing || DEFAULT_PRICING_NAME,
+    region,
+    since,
   });
 }

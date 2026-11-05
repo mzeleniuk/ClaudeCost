@@ -107,10 +107,12 @@ test("loadProfiles resolves an optional pricing path", () => {
 
 test("loadProfiles reads an optional region and rejects unknown ones", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-profiles-"));
+  const workDir = path.join(root, "work");
+  fs.mkdirSync(path.join(workDir, "projects"), { recursive: true });
   const file = writeProfiles(root, {
     profiles: [
       { name: "vertex", dir: fixture },
-      { name: "work", dir: fixture, region: "eu" },
+      { name: "work", dir: workDir, region: "eu" },
     ],
   });
 
@@ -125,4 +127,76 @@ test("loadProfiles reads an optional region and rejects unknown ones", () => {
     () => loadProfiles(file),
     /unknown region "mars" in profile "work"/,
   );
+});
+
+function makeConfigDir(...parts) {
+  const dir = path.join(...parts);
+  fs.mkdirSync(path.join(dir, "projects"), { recursive: true });
+  return dir;
+}
+
+test("loadProfiles rejects two profiles with the same config directory", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-profiles-"));
+  const dir = makeConfigDir(root, "shared");
+  const file = writeProfiles(root, {
+    profiles: [
+      { name: "vertex", dir },
+      // Same directory, spelled differently
+      { name: "work", dir: path.join(root, "x", "..", "shared") },
+    ],
+  });
+
+  assert.throws(
+    () => loadProfiles(file),
+    /profile "work" reads the same transcript directory as "vertex" \(.*\), so they would be counted twice/,
+  );
+});
+
+test("loadProfiles rejects a profile whose transcripts sit inside another's", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-profiles-"));
+  const outer = makeConfigDir(root, "outer");
+  const inner = makeConfigDir(outer, "projects", "nested");
+
+  for (const [first, second, relation] of [
+    [outer, inner, /profile "b" reads transcripts inside "a"'s/],
+    [inner, outer, /profile "b" reads transcripts that contain "a"'s/],
+  ]) {
+    const file = writeProfiles(root, {
+      profiles: [
+        { name: "a", dir: first },
+        { name: "b", dir: second },
+      ],
+    });
+    assert.throws(() => loadProfiles(file), relation);
+  }
+});
+
+test("loadProfiles rejects profiles linked to the same transcripts", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-profiles-"));
+  const real = makeConfigDir(root, "real");
+  const link = path.join(root, "link");
+  fs.symlinkSync(real, link);
+  const file = writeProfiles(root, {
+    profiles: [
+      { name: "vertex", dir: real },
+      { name: "work", dir: link },
+    ],
+  });
+
+  assert.throws(
+    () => loadProfiles(file),
+    /reads the same transcript directory/,
+  );
+});
+
+test("loadProfiles accepts sibling directories with a shared name prefix", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-profiles-"));
+  const file = writeProfiles(root, {
+    profiles: [
+      { name: "vertex", dir: makeConfigDir(root, ".claude") },
+      { name: "work", dir: makeConfigDir(root, ".claude-work") },
+    ],
+  });
+
+  assert.equal(loadProfiles(file).length, 2);
 });

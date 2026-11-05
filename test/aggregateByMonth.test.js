@@ -67,20 +67,21 @@ test("groups events by month and model", async () => {
   assert.equal(feb.models.size, 2);
 });
 
+// Local dates: months are bucketed in local time.
 test("sortedMonthKeys returns ascending order", async () => {
   const events = mockEvents([
     {
-      ts: new Date("2025-03-01"),
+      ts: new Date(2025, 2, 1),
       model: "claude-sonnet-4",
       usage: usage(100, 0),
     },
     {
-      ts: new Date("2025-01-01"),
+      ts: new Date(2025, 0, 1),
       model: "claude-sonnet-4",
       usage: usage(100, 0),
     },
     {
-      ts: new Date("2025-02-01"),
+      ts: new Date(2025, 1, 1),
       model: "claude-sonnet-4",
       usage: usage(100, 0),
     },
@@ -93,12 +94,12 @@ test("sortedMonthKeys returns ascending order", async () => {
 test("respects --since filter", async () => {
   const events = mockEvents([
     {
-      ts: new Date("2025-01-01"),
+      ts: new Date(2025, 0, 1),
       model: "claude-sonnet-4",
       usage: usage(1_000_000, 0),
     },
     {
-      ts: new Date("2025-02-01"),
+      ts: new Date(2025, 1, 1),
       model: "claude-sonnet-4",
       usage: usage(1_000_000, 0),
     },
@@ -106,7 +107,7 @@ test("respects --since filter", async () => {
 
   const { months, total } = await aggregateByMonth(events, {
     pricing: PRICING,
-    since: new Date("2025-02-01"),
+    since: new Date(2025, 1, 1),
   });
 
   assert.equal(months.size, 1);

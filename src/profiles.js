@@ -14,6 +14,40 @@ export const DEFAULT_PROFILES_PATH = path.join(
   "profiles.config.json",
 );
 
+/** True when `inner` is `outer` or a path below it. Both must be real paths. */
+function isSameOrInside(inner, outer) {
+  const rel = path.relative(outer, inner);
+  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+}
+
+/**
+ * Throw if this profile's transcripts overlap an earlier profile's, since
+ * every shared transcript would be counted in both.
+ */
+function checkOverlap(profile, earlier) {
+  const a = profile.realProjectsDir;
+
+  for (const other of earlier) {
+    const b = other.realProjectsDir;
+    let detail = null;
+
+    if (a === b) {
+      detail = `the same transcript directory as "${other.name}" (${a})`;
+    } else if (isSameOrInside(a, b)) {
+      detail = `transcripts inside "${other.name}"'s (${a} is inside ${b})`;
+    } else if (isSameOrInside(b, a)) {
+      detail = `transcripts that contain "${other.name}"'s (${b} is inside ${a})`;
+    }
+
+    if (detail) {
+      throw new Error(
+        `profile "${profile.name}" reads ${detail}, so they would be counted ` +
+          "twice. Give each profile its own config directory.",
+      );
+    }
+  }
+}
+
 function resolveUserPath(value, configFilePath) {
   const expanded = expandHome(value);
   if (path.isAbsolute(expanded)) return expanded;
@@ -57,8 +91,9 @@ export function loadProfiles(filePath = DEFAULT_PROFILES_PATH) {
     );
   }
 
-  const seen = new Set();
   const loaded = [];
+  const realDirs = [];
+  const seen = new Set();
 
   for (let i = 0; i < profiles.length; i++) {
     const entry = profiles[i];
@@ -103,6 +138,15 @@ export function loadProfiles(filePath = DEFAULT_PROFILES_PATH) {
         `profile "${name}" transcript directory not found: ${projectsDir}`,
       );
     }
+
+    // .native also normalizes letter case on case-insensitive file systems.
+    const current = {
+      name,
+      realProjectsDir: fs.realpathSync.native(projectsDir),
+    };
+
+    checkOverlap(current, realDirs);
+    realDirs.push(current);
 
     let pricing = null;
 

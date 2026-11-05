@@ -19,7 +19,8 @@ test("expandHome expands ~ and ~/ paths", () => {
 
 test("defaultTranscriptDirs is modern-first projects only", () => {
   const home = os.homedir();
-  const dirs = defaultTranscriptDirs();
+  const dirs = defaultTranscriptDirs({});
+
   assert.deepEqual(dirs, [
     path.join(home, ".config", "claude", "projects"),
     path.join(home, ".claude", "projects"),
@@ -38,4 +39,34 @@ test("resolveTranscriptDirs throws for missing --dir", () => {
     () => resolveTranscriptDirs("/nonexistent/claude-cost-path-xyz"),
     /transcript directory not found/,
   );
+});
+
+test("defaultTranscriptDirs uses only CLAUDE_CONFIG_DIR when it is set", () => {
+  const home = os.homedir();
+
+  assert.deepEqual(
+    defaultTranscriptDirs({ CLAUDE_CONFIG_DIR: "/srv/claude" }),
+    [path.join("/srv/claude", "projects")],
+  );
+  assert.deepEqual(
+    defaultTranscriptDirs({ CLAUDE_CONFIG_DIR: "~/.claude-work" }),
+    [path.join(home, ".claude-work", "projects")],
+  );
+  // An empty value is treated as unset
+  assert.equal(defaultTranscriptDirs({ CLAUDE_CONFIG_DIR: " " }).length, 2);
+});
+
+test("resolveTranscriptDirs reads CLAUDE_CONFIG_DIR and names it when empty", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-config-"));
+  const env = { CLAUDE_CONFIG_DIR: root };
+
+  assert.throws(
+    () => resolveTranscriptDirs(undefined, env),
+    /could not locate Claude Code transcripts in CLAUDE_CONFIG_DIR \(/,
+  );
+
+  fs.mkdirSync(path.join(root, "projects"));
+  assert.deepEqual(resolveTranscriptDirs(undefined, env), [
+    path.join(root, "projects"),
+  ]);
 });

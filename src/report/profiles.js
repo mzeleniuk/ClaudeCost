@@ -67,13 +67,14 @@ export function renderProfileReports(
     return;
   }
 
-  for (const { profile, region, result } of reports) {
+  for (const { profile, region, pricingFile, result } of reports) {
     const title = `${profile.name} (${profile.configuredDir})`;
+    const opts = { since, title, region, pricingFile, showNote: false };
 
     if (byMonth) {
-      renderMonthlyTable(result, { since, title, region, showNote: false });
+      renderMonthlyTable(result, opts);
     } else {
-      renderTable(result, { byModel, since, title, region, showNote: false });
+      renderTable(result, { ...opts, byModel });
     }
   }
 

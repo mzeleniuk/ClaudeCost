@@ -23,7 +23,7 @@ function modelRows(models) {
 
 export function renderMonthlyTable(
   result,
-  { since, title, region, showNote = true },
+  { since, title, region, pricingFile, showNote = true },
 ) {
   const { months, total, skippedUndated } = result;
   const lines = [];
@@ -53,7 +53,7 @@ export function renderMonthlyTable(
     );
   }
 
-  lines.push(...warningLines(result, region));
+  lines.push(...warningLines(result, { region, pricingFile }));
 
   if (showNote) {
     lines.push("");

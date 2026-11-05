@@ -13,15 +13,19 @@ export function regionLines(region) {
   return [`Region: ${describeRegion(region)}`];
 }
 
-/** Warnings printed under a report's total. */
-export function warningLines({ unknownModels, notInRegion = [] }, region) {
+/**
+ * Warnings printed under a report's total.
+ * `pricingFile` names the pricing file the report used.
+ */
+export function warningLines(
+  { unknownModels, notInRegion = [] },
+  { region, pricingFile = "pricing.config.json" } = {},
+) {
   const lines = [];
 
   if (unknownModels.length) {
     lines.push("");
-    lines.push(
-      "⚠ Unknown models (priced at $0 — add them to pricing.config.json):",
-    );
+    lines.push(`⚠ Unknown models (priced at $0 — add them to ${pricingFile}):`);
 
     for (const m of unknownModels) lines.push(`   - ${m}`);
   }
@@ -40,7 +44,7 @@ export function warningLines({ unknownModels, notInRegion = [] }, region) {
 
 export function renderTable(
   result,
-  { byModel, since, title, region, showNote = true },
+  { byModel, since, title, region, pricingFile, showNote = true },
 ) {
   const { groups, total } = result;
   const lines = [];
@@ -80,7 +84,7 @@ export function renderTable(
     `Total estimated cost: ${fmtUSD(total.costUSD)}  (${total.messages} messages)`,
   );
 
-  lines.push(...warningLines(result, region));
+  lines.push(...warningLines(result, { region, pricingFile }));
 
   if (showNote) {
     lines.push("");
