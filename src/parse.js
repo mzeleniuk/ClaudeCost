@@ -119,6 +119,10 @@ export async function* readUsageEvents(file) {
   });
 
   for await (const line of rl) {
+    // Most lines are tool output and chat text with no usage. A usage key is
+    // always written as the literal "usage", so skip the rest before parsing.
+    if (!line.includes('"usage"')) continue;
+
     const trimmed = line.trim();
     if (!trimmed) continue;
 

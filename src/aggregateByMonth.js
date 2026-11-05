@@ -1,23 +1,6 @@
 import { priceForModel, computeCost } from "./pricing.js";
 import { monthKey } from "./since.js";
-
-const zero = () => ({
-  cacheReadTokens: 0,
-  cacheWriteTokens: 0,
-  costUSD: 0,
-  inputTokens: 0,
-  messages: 0,
-  outputTokens: 0,
-});
-
-function accumulate(bucket, usage, cost) {
-  bucket.cacheReadTokens += usage.cacheRead ?? 0;
-  bucket.cacheWriteTokens += usage.cacheWrite ?? 0;
-  bucket.costUSD += cost;
-  bucket.inputTokens += usage.input ?? 0;
-  bucket.messages += 1;
-  bucket.outputTokens += usage.output ?? 0;
-}
+import { addUsage, emptyTotals } from "./totals.js";
 
 /**
  * Aggregate usage events into per-month, per-model totals.
@@ -30,7 +13,7 @@ function accumulate(bucket, usage, cost) {
 export async function aggregateByMonth(events, { pricing, since = null }) {
   const months = new Map();
   const notInRegion = new Set();
-  const total = zero();
+  const total = emptyTotals();
   const unknownModels = new Set();
   let skippedUndated = 0;
 
@@ -57,20 +40,20 @@ export async function aggregateByMonth(events, { pricing, since = null }) {
     const cost = computeCost(price, ev.usage);
 
     if (!months.has(key)) {
-      months.set(key, { models: new Map(), total: zero() });
+      months.set(key, { models: new Map(), total: emptyTotals() });
     }
 
     const month = months.get(key);
 
     if (!month.models.has(ev.model)) {
-      month.models.set(ev.model, zero());
+      month.models.set(ev.model, emptyTotals());
     }
 
     const modelBucket = month.models.get(ev.model);
 
-    accumulate(modelBucket, ev.usage, cost);
-    accumulate(month.total, ev.usage, cost);
-    accumulate(total, ev.usage, cost);
+    addUsage(modelBucket, ev.usage, cost);
+    addUsage(month.total, ev.usage, cost);
+    addUsage(total, ev.usage, cost);
   }
 
   return {

@@ -1,4 +1,5 @@
 import { priceForModel, computeCost } from "./pricing.js";
+import { addUsage, emptyTotals } from "./totals.js";
 
 /**
  * Aggregate usage events into totals, optionally grouped by model.
@@ -13,18 +14,9 @@ export async function aggregate(
   events,
   { pricing, since = null, byModel = false },
 ) {
-  const zero = () => ({
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheWriteTokens: 0,
-    cacheReadTokens: 0,
-    costUSD: 0,
-    messages: 0,
-  });
-
-  const groups = new Map(); // key -> bucket
+  const groups = new Map();
   const notInRegion = new Set();
-  const total = zero();
+  const total = emptyTotals();
   const unknownModels = new Set();
 
   for await (const ev of events) {
@@ -38,23 +30,10 @@ export async function aggregate(
     const cost = computeCost(price, ev.usage);
     const key = byModel ? ev.model : "__all__";
 
-    if (!groups.has(key)) groups.set(key, zero());
-    const bucket = groups.get(key);
+    if (!groups.has(key)) groups.set(key, emptyTotals());
 
-    const u = ev.usage;
-    for (const [field, tok] of [
-      ["inputTokens", u.input ?? 0],
-      ["outputTokens", u.output ?? 0],
-      ["cacheWriteTokens", u.cacheWrite ?? 0],
-      ["cacheReadTokens", u.cacheRead ?? 0],
-    ]) {
-      bucket[field] += tok;
-      total[field] += tok;
-    }
-    bucket.costUSD += cost;
-    bucket.messages += 1;
-    total.costUSD += cost;
-    total.messages += 1;
+    addUsage(groups.get(key), ev.usage, cost);
+    addUsage(total, ev.usage, cost);
   }
 
   return {

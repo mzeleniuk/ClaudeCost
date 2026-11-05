@@ -1,25 +1,7 @@
 import { sortedMonthKeys } from "../aggregateByMonth.js";
 import { formatLocalDateTime } from "../since.js";
-import { fmtUSD, RECONCILE_NOTE, regionLines, warningLines } from "./table.js";
-
-const fmtNum = (n) => n.toLocaleString("en-US");
-
-function modelRows(models) {
-  const rows = {};
-
-  for (const [model, b] of models) {
-    rows[model] = {
-      cacheRead: fmtNum(b.cacheReadTokens),
-      cacheWrite: fmtNum(b.cacheWriteTokens),
-      cost: fmtUSD(b.costUSD),
-      input: fmtNum(b.inputTokens),
-      msgs: b.messages,
-      output: fmtNum(b.outputTokens),
-    };
-  }
-
-  return rows;
-}
+import { fmtUSD, modelRows } from "./format.js";
+import { RECONCILE_NOTE, regionLines, warningLines } from "./table.js";
 
 export function renderMonthlyTable(
   result,

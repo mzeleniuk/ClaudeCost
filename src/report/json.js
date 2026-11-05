@@ -1,4 +1,4 @@
-const round = (b) => ({ ...b, costUSD: Number(b.costUSD.toFixed(6)) });
+import { roundCost } from "./format.js";
 
 // Totals for one scan, without the report envelope.
 export function buildUsageProfile(
@@ -7,11 +7,11 @@ export function buildUsageProfile(
 ) {
   return {
     notInRegion,
-    total: round(total),
+    total: roundCost(total),
     unknownModels,
     ...(byModel && {
       byModel: Object.fromEntries(
-        [...groups].map(([model, b]) => [model, round(b)]),
+        [...groups].map(([model, b]) => [model, roundCost(b)]),
       ),
     }),
   };

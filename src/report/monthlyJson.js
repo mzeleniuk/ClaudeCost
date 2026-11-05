@@ -1,6 +1,6 @@
 import { sortedMonthKeys } from "../aggregateByMonth.js";
 
-const round = (b) => ({ ...b, costUSD: Number(b.costUSD.toFixed(6)) });
+import { roundCost } from "./format.js";
 
 // Monthly totals for one scan, without the report envelope.
 export function buildMonthlyProfile({
@@ -17,9 +17,9 @@ export function buildMonthlyProfile({
 
     byMonth[key] = {
       models: Object.fromEntries(
-        [...month.models].map(([model, b]) => [model, round(b)]),
+        [...month.models].map(([model, b]) => [model, roundCost(b)]),
       ),
-      total: round(month.total),
+      total: roundCost(month.total),
     };
   }
 
@@ -27,7 +27,7 @@ export function buildMonthlyProfile({
     byMonth,
     notInRegion,
     skippedUndated,
-    total: round(total),
+    total: roundCost(total),
     unknownModels,
   };
 }

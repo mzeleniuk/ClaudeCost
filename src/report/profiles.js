@@ -1,20 +1,13 @@
 import { buildMonthlyProfile } from "./monthlyJson.js";
 import { renderMonthlyTable } from "./monthlyTable.js";
 import { buildUsageProfile } from "./json.js";
-import { fmtUSD, RECONCILE_NOTE, renderTable } from "./table.js";
+import { sumTotals } from "../totals.js";
+import { fmtUSD, roundCost } from "./format.js";
+import { RECONCILE_NOTE, renderTable } from "./table.js";
 
-function sumBuckets(buckets) {
-  const keys = Object.keys(buckets[0]);
-  const total = {};
-
-  for (const key of keys) total[key] = 0;
-  for (const bucket of buckets) {
-    for (const key of keys) total[key] += bucket[key] ?? 0;
-  }
-
-  total.costUSD = Number(total.costUSD.toFixed(6));
-  return total;
-}
+const profilesTotal = (reports) => {
+  return roundCost(sumTotals(reports.map((report) => report.result.total)));
+};
 
 function buildProfilesUsage(reports, { byModel, since }) {
   return {
@@ -27,7 +20,7 @@ function buildProfilesUsage(reports, { byModel, since }) {
       region,
       ...buildUsageProfile(result, { byModel }),
     })),
-    total: sumBuckets(reports.map((report) => report.result.total)),
+    total: profilesTotal(reports),
   };
 }
 
@@ -46,7 +39,7 @@ function buildProfilesMonthly(reports, since) {
       (sum, report) => sum + report.result.skippedUndated,
       0,
     ),
-    total: sumBuckets(reports.map((report) => report.result.total)),
+    total: profilesTotal(reports),
   };
 }
 
@@ -78,7 +71,7 @@ export function renderProfileReports(
     }
   }
 
-  const total = sumBuckets(reports.map((report) => report.result.total));
+  const total = profilesTotal(reports);
 
   console.log("");
   console.log(

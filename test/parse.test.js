@@ -186,6 +186,32 @@ test("readUsageEvents yields advisors when parent usage is all zero", async () =
   assert.equal(events[0].usage.input, 7);
 });
 
+test("readUsageEvents skips lines without a usage key", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-parse-"));
+  const file = path.join(dir, "session.jsonl");
+
+  fs.writeFileSync(
+    file,
+    [
+      // No usage key at all
+      JSON.stringify({ type: "user", message: { content: "hello" } }),
+      // "usage" appears only inside text, not as a key
+      JSON.stringify({ message: { content: 'the "usage" field is empty' } }),
+      // Spacing around the key does not matter
+      '{"message": {"id": "m1", "model": "claude-opus-5-5", "usage" : {"input_tokens": 7}}}',
+    ].join("\n"),
+  );
+
+  const events = [];
+  for await (const ev of readUsageEvents(file)) events.push(ev);
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0].messageId, "m1");
+  assert.equal(events[0].usage.input, 7);
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test("findTranscripts discovers jsonl files recursively", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-parse-"));
   const nested = path.join(root, "proj", "nested");

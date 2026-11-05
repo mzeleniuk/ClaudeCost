@@ -1,8 +1,6 @@
 import { DEFAULT_REGION, describeRegion } from "../regions.js";
 import { formatLocalDateTime } from "../since.js";
-
-export const fmtUSD = (n) => `$${n.toFixed(4)}`;
-const fmtNum = (n) => n.toLocaleString("en-US");
+import { fmtNum, fmtUSD, modelRows } from "./format.js";
 
 export const RECONCILE_NOTE =
   "Note: approximate. Reconcile with your GCP Billing export.";
@@ -52,18 +50,7 @@ export function renderTable(
   if (title) console.log(`\n======== ${title} ========`);
 
   if (byModel) {
-    const rows = {};
-    for (const [model, b] of groups) {
-      rows[model] = {
-        input: fmtNum(b.inputTokens),
-        output: fmtNum(b.outputTokens),
-        cacheRead: fmtNum(b.cacheReadTokens),
-        cacheWrite: fmtNum(b.cacheWriteTokens),
-        msgs: b.messages,
-        cost: fmtUSD(b.costUSD),
-      };
-    }
-    console.table(rows);
+    console.table(modelRows(groups));
   } else {
     console.table({
       input: fmtNum(total.inputTokens),
