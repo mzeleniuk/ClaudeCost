@@ -107,6 +107,7 @@
  * @property {string} [region]
  * @property {string} [pricingFile] Pricing file name shown in warnings.
  * @property {string} [title]
+ * @property {string} [subtitle] Printed dim after the title.
  * @property {boolean} [showNote] Print the reconciliation note. Default true.
  */
 

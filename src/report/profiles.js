@@ -1,10 +1,10 @@
 // @ts-check
 import { sumTotals } from "../totals.js";
-import { fmtUSD, formatJson, roundCost } from "./format.js";
+import { COST_COLUMNS, formatJson, renderGrid, roundCost } from "./format.js";
 import { buildUsageProfile } from "./json.js";
 import { buildMonthlyProfile } from "./monthlyJson.js";
 import { renderMonthlyTable } from "./monthlyTable.js";
-import { RECONCILE_NOTE, renderTable } from "./table.js";
+import { INDENT, headingLines, noteLines, renderTable } from "./table.js";
 
 /**
  * @import {
@@ -100,8 +100,14 @@ export function renderProfileReports(
   }
 
   const sections = reports.map(({ profile, region, pricingFile, result }) => {
-    const title = `${profile.name} (${profile.configuredDir})`;
-    const opts = { since, title, region, pricingFile, showNote: false };
+    const opts = {
+      since,
+      title: profile.name,
+      subtitle: profile.configuredDir,
+      region,
+      pricingFile,
+      showNote: false,
+    };
 
     return byMonth
       ? renderMonthlyTable(/** @type {MonthlyResult} */ (result), opts)
@@ -111,13 +117,23 @@ export function renderProfileReports(
         });
   });
 
-  const total = profilesTotal(reports);
+  const [summary] = renderGrid(
+    [
+      {
+        rows: reports.map(({ profile, result }) => [
+          profile.name,
+          result.total,
+        ]),
+        total: profilesTotal(reports),
+      },
+    ],
+    { label: "profile", columns: COST_COLUMNS },
+  );
 
   return [
     ...sections,
-    "",
-    `All profiles: ${fmtUSD(total.costUSD)}  (${total.messages} messages)`,
-    "",
-    RECONCILE_NOTE,
+    ...headingLines("All profiles"),
+    ...summary.map((line, i) => (i === 0 ? "  ⎿  " : INDENT) + line),
+    ...noteLines(),
   ].join("\n");
 }

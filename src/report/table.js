@@ -1,26 +1,48 @@
 // @ts-check
 import { DEFAULT_REGION, describeRegion } from "../regions.js";
 import { formatLocalDateTime } from "../since.js";
-import { fmtNum, fmtUSD, formatTable, modelRows } from "./format.js";
+import { bold, byCostDesc, dim, renderGrid, warn } from "./format.js";
 
 /** @import { AggregateResult, PricingSummary, ReportOptions } from "../types.js" */
 
 export const RECONCILE_NOTE =
-  "Note: approximate. Reconcile with your GCP Billing export.";
+  "Approximate. Reconcile with your GCP Billing export.";
+
+// Section bodies sit under the "  ⎿  " branch.
+export const INDENT = "     ";
 
 /**
- * "Region: ..." line, or nothing for the default global endpoint.
+ * Report heading in the style of a Claude Code tool call.
  *
- * @param {string} [region]
+ * @param {string} [title]
+ * @param {string} [subtitle] Printed dim after the title.
  * @returns {string[]}
  */
-export function regionLines(region) {
-  if (!region || region === DEFAULT_REGION) return [];
-  return [`Region: ${describeRegion(region)}`];
+export function headingLines(title = "Claude Code usage", subtitle) {
+  return ["", `⏺ ${bold(title)}${subtitle ? ` ${dim(subtitle)}` : ""}`];
 }
 
 /**
- * Warnings printed under a report's total.
+ * What the report covers: the time range, plus the region when it is not
+ * the default global endpoint.
+ *
+ * @param {Date | null} since
+ * @param {string} [region]
+ */
+export function scopeLine(since, region) {
+  const parts = [
+    since ? `Since ${formatLocalDateTime(since)} local` : "All history",
+  ];
+
+  if (region && region !== DEFAULT_REGION) {
+    parts.push(`region ${describeRegion(region)}`);
+  }
+
+  return `  ⎿  ${dim(parts.join(", "))}`;
+}
+
+/**
+ * Warnings printed under a report's table.
  * `pricingFile` names the pricing file the report used.
  *
  * @param {Pick<PricingSummary, "unknownModels"> & { notInRegion?: string[] }} result
@@ -34,33 +56,28 @@ export function warningLines(
   const lines = [];
 
   if (unknownModels.length) {
-    lines.push("");
-    lines.push(`⚠ Unknown models (priced at $0 — add them to ${pricingFile}):`);
-
-    for (const m of unknownModels) lines.push(`   - ${m}`);
+    lines.push(
+      "",
+      `${INDENT}${warn("⚠")} Unknown models, priced at $0. Add them to ${pricingFile}`,
+      ...unknownModels.map((m) => `${INDENT}  ${dim(m)}`),
+    );
   }
 
   if (notInRegion.length) {
-    lines.push("");
     lines.push(
-      `⚠ Not offered at the ${region} endpoint (priced at ${region} rates anyway, so check your region setting):`,
+      "",
+      `${INDENT}${warn("⚠")} Not offered at the ${region} endpoint. Priced at ${region} rates anyway, so check your region setting`,
+      ...notInRegion.map((m) => `${INDENT}  ${dim(m)}`),
     );
-
-    for (const m of notInRegion) lines.push(`   - ${m}`);
   }
 
   return lines;
 }
 
-/**
- * Section heading used when several reports are printed together.
- *
- * @param {string | undefined} title
- * @returns {string[]}
- */
-export function titleLines(title) {
-  return title ? [`\n======== ${title} ========`] : [];
-}
+export const EMPTY_LINE = `${INDENT}${dim("No activity in this period.")}`;
+
+/** @param {string} text */
+export const noteLines = (text = RECONCILE_NOTE) => ["", `  ${dim(text)}`];
 
 /**
  * Text report for `aggregate` results.
@@ -70,32 +87,23 @@ export function titleLines(title) {
  */
 export function renderTable(
   result,
-  { byModel, since, title, region, pricingFile, showNote = true },
+  { byModel, since, title, subtitle, region, pricingFile, showNote = true },
 ) {
   const { groups, total } = result;
-  const rows = byModel
-    ? modelRows(groups)
-    : {
-        input: fmtNum(total.inputTokens),
-        output: fmtNum(total.outputTokens),
-        cacheRead: fmtNum(total.cacheReadTokens),
-        cacheWrite: fmtNum(total.cacheWriteTokens),
-        messages: total.messages,
-        cost: fmtUSD(total.costUSD),
-      };
+  const [grid] = renderGrid([
+    byModel
+      ? { rows: byCostDesc([...groups]), total }
+      : { rows: [["all models", total]] },
+  ]);
 
-  const lines = [...titleLines(title), formatTable(rows), ""];
+  const lines = [
+    ...headingLines(title, subtitle),
+    scopeLine(since, region),
+    "",
+    ...(total.messages ? grid.map((line) => INDENT + line) : [EMPTY_LINE]),
+    ...warningLines(result, { region, pricingFile }),
+  ];
 
-  if (since) lines.push(`Since:  ${formatLocalDateTime(since)} (local)`);
-  lines.push(...regionLines(region));
-
-  lines.push(
-    `Total estimated cost: ${fmtUSD(total.costUSD)}  (${total.messages} messages)`,
-  );
-
-  lines.push(...warningLines(result, { region, pricingFile }));
-
-  if (showNote) lines.push("", RECONCILE_NOTE);
-
+  if (showNote) lines.push(...noteLines());
   return lines.join("\n");
 }

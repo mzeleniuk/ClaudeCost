@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { promisify } from "node:util";
+import { promisify, stripVTControlCharacters } from "node:util";
 
 import { run } from "../src/cli.js";
 
@@ -116,12 +116,17 @@ async function cli(args) {
 
 test("prints a per-model table with the total and unknown models", async () => {
   const { stdout, pricing } = await cli(["--by-model"]);
+  const text = stripVTControlCharacters(stdout);
 
-  assert.match(stdout, /claude-test-a .*'1,000,000' .*'\$3\.0000'/);
-  assert.match(stdout, /claude-test-b@20260101 .*'1,000,000' .*'\$4\.0000'/);
-  assert.match(stdout, /Total estimated cost: \$7\.0000 {2}\(3 messages\)/);
-  assert.ok(stdout.includes(`add them to ${pricing}`));
-  assert.match(stdout, /^ {3}- claude-mystery$/m);
+  assert.match(text, /^ {5}claude-test-a +1M +1M +0 +0 +1 +\$3\.00  █+/m);
+  assert.match(
+    text,
+    /^ {5}claude-test-b@20260101 +0 +0 +0 +1M +1 +\$4\.00  █+/m,
+  );
+  assert.match(text, /^ {5}total .* 3 +\$7\.00$/m);
+  assert.ok(text.includes(`Add them to ${pricing}`));
+  assert.match(text, /^ {5}claude-mystery .* \$0\.00$/m);
+  assert.match(text, /^ {7}claude-mystery$/m);
   assert.match(stdout, /Reconcile with your GCP Billing export/);
 });
 
