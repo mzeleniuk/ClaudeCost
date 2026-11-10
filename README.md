@@ -117,6 +117,19 @@ Some models charge more for long prompts. Add a `longContext` object with a `thr
 }
 ```
 
+## Use from any Claude session
+
+The repo ships a Claude Code skill in `.claude/skills/claude-cost`. Once it's linked into your user skills folder, Claude in any workspace can answer "how much have I spent this month?" by running this CLI. To link it, run this from the clone:
+
+```bash
+mkdir -p ~/.claude/skills
+ln -s "$PWD/.claude/skills/claude-cost" ~/.claude/skills/claude-cost
+```
+
+Skills are read per config directory. If you use `CLAUDE_CONFIG_DIR` or keep several accounts, repeat the link for each one, for example `~/.claude-work/skills`. Because these are links, changes you pull into the clone apply right away.
+
+Claude asks once before it runs the skill. To skip that prompt, add `Skill(claude-cost)` to `permissions.allow` in your settings.
+
 ## Development
 
 ```bash
