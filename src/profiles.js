@@ -1,20 +1,26 @@
+// @ts-check
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { expandHome } from "./config.js";
 import { validateRegion } from "./regions.js";
+import { isPlainObject, readJsonObject } from "./validate.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+/** @import { Profile } from "./types.js" */
 
 /** Local profile list. Sits next to pricing.config.json and is not committed. */
 export const DEFAULT_PROFILES_PATH = path.join(
-  __dirname,
+  import.meta.dirname,
   "..",
   "profiles.config.json",
 );
 
-/** True when `inner` is `outer` or a path below it. Both must be real paths. */
+/**
+ * True when `inner` is `outer` or a path below it. Both must be real paths.
+ *
+ * @param {string} inner
+ * @param {string} outer
+ */
 function isSameOrInside(inner, outer) {
   const rel = path.relative(outer, inner);
   return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
@@ -23,6 +29,9 @@ function isSameOrInside(inner, outer) {
 /**
  * Throw if this profile's transcripts overlap an earlier profile's, since
  * every shared transcript would be counted in both.
+ *
+ * @param {{ name: string, realProjectsDir: string }} profile
+ * @param {{ name: string, realProjectsDir: string }[]} earlier
  */
 function checkOverlap(profile, earlier) {
   const a = profile.realProjectsDir;
@@ -48,10 +57,93 @@ function checkOverlap(profile, earlier) {
   }
 }
 
+/**
+ * Expand `~` and resolve a relative path against the config file's directory.
+ *
+ * @param {string} value
+ * @param {string} configFilePath
+ */
 function resolveUserPath(value, configFilePath) {
   const expanded = expandHome(value);
+
   if (path.isAbsolute(expanded)) return expanded;
   return path.resolve(path.dirname(configFilePath), expanded);
+}
+
+/**
+ * Validate one entry of the `profiles` array and resolve its paths.
+ *
+ * @param {unknown} entry
+ * @param {number} index
+ * @param {string} filePath
+ * @returns {Profile}
+ */
+function parseProfile(entry, index, filePath) {
+  if (!isPlainObject(entry)) {
+    throw new Error(`invalid profile at index ${index}: expected object`);
+  }
+
+  const name = typeof entry.name === "string" ? entry.name.trim() : "";
+
+  if (!name) {
+    throw new Error(
+      `invalid profile at index ${index}: name must be a non-empty string`,
+    );
+  }
+
+  if (typeof entry.dir !== "string" || entry.dir.trim() === "") {
+    throw new Error(
+      `invalid profile "${name}": dir must be a non-empty string`,
+    );
+  }
+
+  const configuredDir = entry.dir.trim();
+  const dir = resolveUserPath(configuredDir, filePath);
+
+  if (!fs.existsSync(dir)) {
+    throw new Error(
+      `profile "${name}" config directory not found: ${configuredDir}`,
+    );
+  }
+
+  const projectsDir = path.join(dir, "projects");
+
+  if (!fs.existsSync(projectsDir)) {
+    throw new Error(
+      `profile "${name}" transcript directory not found: ${projectsDir}`,
+    );
+  }
+
+  let pricing = null;
+
+  if (entry.pricing != null) {
+    if (typeof entry.pricing !== "string" || entry.pricing.trim() === "") {
+      throw new Error(
+        `invalid profile "${name}": pricing must be a non-empty string`,
+      );
+    }
+
+    const configuredPricing = entry.pricing.trim();
+    pricing = resolveUserPath(configuredPricing, filePath);
+
+    if (!fs.existsSync(pricing)) {
+      throw new Error(
+        `profile "${name}" pricing file not found: ${configuredPricing}`,
+      );
+    }
+  }
+
+  let region = null;
+
+  if (entry.region != null) {
+    if (typeof entry.region !== "string") {
+      throw new Error(`invalid profile "${name}": region must be a string`);
+    }
+
+    region = validateRegion(entry.region, `profile "${name}"`);
+  }
+
+  return { name, dir, configuredDir, projectsDir, pricing, region };
 }
 
 /**
@@ -60,24 +152,12 @@ function resolveUserPath(value, configFilePath) {
  * the default. `dir` is a Claude config directory; transcripts are in `projects`.
  *
  * @param {string} [filePath]
- * @returns {Array<{ name: string, dir: string, configuredDir: string, projectsDir: string, pricing: string|null, region: string|null }>|null}
+ * @returns {Profile[] | null}
  */
 export function loadProfiles(filePath = DEFAULT_PROFILES_PATH) {
   if (!fs.existsSync(filePath)) return null;
 
-  let parsed;
-
-  try {
-    parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
-  } catch {
-    throw new Error(`invalid profiles file (expected JSON): ${filePath}`);
-  }
-
-  if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error(`invalid profiles file (expected object): ${filePath}`);
-  }
-
-  const { profiles } = parsed;
+  const { profiles } = readJsonObject(filePath, "profiles");
 
   if (!Array.isArray(profiles)) {
     throw new Error(
@@ -91,100 +171,26 @@ export function loadProfiles(filePath = DEFAULT_PROFILES_PATH) {
     );
   }
 
+  /** @type {Profile[]} */
   const loaded = [];
   const realDirs = [];
-  const seen = new Set();
 
-  for (let i = 0; i < profiles.length; i++) {
-    const entry = profiles[i];
+  for (const [index, entry] of profiles.entries()) {
+    const profile = parseProfile(entry, index, filePath);
 
-    if (entry == null || typeof entry !== "object" || Array.isArray(entry)) {
-      throw new Error(`invalid profile at index ${i}: expected object`);
-    }
-
-    const name = typeof entry.name === "string" ? entry.name.trim() : "";
-
-    if (!name) {
-      throw new Error(
-        `invalid profile at index ${i}: name must be a non-empty string`,
-      );
-    }
-
-    if (seen.has(name)) {
-      throw new Error(`duplicate profile name "${name}"`);
-    }
-
-    seen.add(name);
-
-    if (typeof entry.dir !== "string" || entry.dir.trim() === "") {
-      throw new Error(
-        `invalid profile "${name}": dir must be a non-empty string`,
-      );
-    }
-
-    const configuredDir = entry.dir.trim();
-    const dir = resolveUserPath(configuredDir, filePath);
-
-    if (!fs.existsSync(dir)) {
-      throw new Error(
-        `profile "${name}" config directory not found: ${configuredDir}`,
-      );
-    }
-
-    const projectsDir = path.join(dir, "projects");
-
-    if (!fs.existsSync(projectsDir)) {
-      throw new Error(
-        `profile "${name}" transcript directory not found: ${projectsDir}`,
-      );
+    if (loaded.some((other) => other.name === profile.name)) {
+      throw new Error(`duplicate profile name "${profile.name}"`);
     }
 
     // .native also normalizes letter case on case-insensitive file systems.
     const current = {
-      name,
-      realProjectsDir: fs.realpathSync.native(projectsDir),
+      name: profile.name,
+      realProjectsDir: fs.realpathSync.native(profile.projectsDir),
     };
 
     checkOverlap(current, realDirs);
     realDirs.push(current);
-
-    let pricing = null;
-
-    if (entry.pricing != null) {
-      if (typeof entry.pricing !== "string" || entry.pricing.trim() === "") {
-        throw new Error(
-          `invalid profile "${name}": pricing must be a non-empty string`,
-        );
-      }
-
-      const configuredPricing = entry.pricing.trim();
-      pricing = resolveUserPath(configuredPricing, filePath);
-
-      if (!fs.existsSync(pricing)) {
-        throw new Error(
-          `profile "${name}" pricing file not found: ${configuredPricing}`,
-        );
-      }
-    }
-
-    let region = null;
-
-    if (entry.region != null) {
-      if (typeof entry.region !== "string") {
-        throw new Error(`invalid profile "${name}": region must be a string`);
-      }
-
-      region = validateRegion(entry.region, `profile "${name}"`);
-    }
-
-    loaded.push({
-      name,
-      dir,
-      configuredDir,
-      projectsDir,
-      pricing,
-      region,
-    });
+    loaded.push(profile);
   }
 
   return loaded;

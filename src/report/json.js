@@ -1,6 +1,14 @@
-import { roundCost } from "./format.js";
+// @ts-check
+import { formatJson, roundCost } from "./format.js";
 
-// Totals for one scan, without the report envelope.
+/** @import { AggregateResult } from "../types.js" */
+
+/**
+ * Totals for one scan, without the report envelope.
+ *
+ * @param {AggregateResult} result
+ * @param {{ byModel: boolean }} opts
+ */
 export function buildUsageProfile(
   { groups, notInRegion, total, unknownModels },
   { byModel },
@@ -11,15 +19,22 @@ export function buildUsageProfile(
     unknownModels,
     ...(byModel && {
       byModel: Object.fromEntries(
-        [...groups].map(([model, b]) => [model, roundCost(b)]),
+        [...groups].map(([model, totals]) => [model, roundCost(totals)]),
       ),
     }),
   };
 }
 
+/**
+ * JSON report for `aggregate` results.
+ *
+ * @param {AggregateResult} result
+ * @param {{ byModel: boolean, since: Date | null, region?: string }} opts
+ */
 export function renderJson(result, { byModel, since, region }) {
   const profile = buildUsageProfile(result, { byModel });
-  const output = {
+
+  return formatJson({
     generatedAt: new Date().toISOString(),
     groupedBy: byModel ? "model" : "none",
     notInRegion: profile.notInRegion,
@@ -28,7 +43,5 @@ export function renderJson(result, { byModel, since, region }) {
     total: profile.total,
     unknownModels: profile.unknownModels,
     ...(byModel && { byModel: profile.byModel }),
-  };
-
-  process.stdout.write(JSON.stringify(output, null, 2) + "\n");
+  });
 }

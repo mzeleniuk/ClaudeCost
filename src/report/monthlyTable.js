@@ -1,23 +1,33 @@
-import { sortedMonthKeys } from "../aggregateByMonth.js";
+// @ts-check
+import { sortedMonths } from "../aggregate.js";
 import { formatLocalDateTime } from "../since.js";
-import { fmtUSD, modelRows } from "./format.js";
-import { RECONCILE_NOTE, regionLines, warningLines } from "./table.js";
+import { fmtUSD, formatTable, modelRows } from "./format.js";
+import {
+  RECONCILE_NOTE,
+  regionLines,
+  titleLines,
+  warningLines,
+} from "./table.js";
 
+/** @import { MonthlyResult, ReportOptions } from "../types.js" */
+
+/**
+ * Text report for `aggregateByMonth` results: one table per month.
+ *
+ * @param {MonthlyResult} result
+ * @param {ReportOptions} opts
+ */
 export function renderMonthlyTable(
   result,
   { since, title, region, pricingFile, showNote = true },
 ) {
   const { months, total, skippedUndated } = result;
-  const lines = [];
+  const lines = titleLines(title);
 
-  if (title) console.log(`\n======== ${title} ========`);
-
-  for (const key of sortedMonthKeys(months)) {
-    const month = months.get(key);
-
-    console.log(`\n=== ${key} (local) ===`);
-    console.table(modelRows(month.models));
-    console.log(
+  for (const [key, month] of sortedMonths(months)) {
+    lines.push(
+      `\n=== ${key} (local) ===`,
+      formatTable(modelRows(month.models)),
       `Month total: ${fmtUSD(month.total.costUSD)} (${month.total.messages} messages)`,
     );
   }
@@ -37,10 +47,7 @@ export function renderMonthlyTable(
 
   lines.push(...warningLines(result, { region, pricingFile }));
 
-  if (showNote) {
-    lines.push("");
-    lines.push(RECONCILE_NOTE);
-  }
+  if (showNote) lines.push("", RECONCILE_NOTE);
 
-  console.log(lines.join("\n"));
+  return lines.join("\n");
 }

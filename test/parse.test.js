@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import {
   findTranscripts,
@@ -12,8 +11,7 @@ import {
   advisorUsagesFromRaw,
 } from "../src/parse.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const FIXTURES = path.join(__dirname, "fixtures");
+const FIXTURES = path.join(import.meta.dirname, "fixtures");
 const SAMPLE = path.join(FIXTURES, "sample.jsonl");
 
 test("readUsageEvents parses nested message usage", async () => {
@@ -153,6 +151,7 @@ test("readUsageEvents expands advisor_message iterations", async () => {
 test("readUsageEvents yields advisors when parent usage is all zero", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-advisor-"));
   const file = path.join(dir, "session.jsonl");
+
   fs.writeFileSync(
     file,
     JSON.stringify({
@@ -215,6 +214,7 @@ test("readUsageEvents skips lines without a usage key", async () => {
 test("findTranscripts discovers jsonl files recursively", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-parse-"));
   const nested = path.join(root, "proj", "nested");
+
   fs.mkdirSync(nested, { recursive: true });
   fs.writeFileSync(path.join(nested, "session.jsonl"), "{}");
   fs.writeFileSync(path.join(root, "notes.txt"), "skip");
@@ -227,6 +227,7 @@ test("findTranscripts discovers jsonl files recursively", async () => {
 test("findTranscripts avoids symlink cycles", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-symlink-"));
   const sub = path.join(root, "sub");
+
   fs.mkdirSync(sub);
   fs.writeFileSync(path.join(sub, "session.jsonl"), "{}");
   fs.symlinkSync(sub, path.join(root, "loop"), "dir");

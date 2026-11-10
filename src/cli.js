@@ -1,7 +1,7 @@
+// @ts-check
 import { parseArgs } from "node:util";
 
-import { aggregate } from "./aggregate.js";
-import { aggregateByMonth } from "./aggregateByMonth.js";
+import { aggregate, aggregateByMonth } from "./aggregate.js";
 import { dedupeEvents } from "./dedupe.js";
 import { findTranscripts, readUsageEvents } from "./parse.js";
 import { loadPricing } from "./pricing.js";
@@ -15,6 +15,8 @@ import { renderMonthlyJson } from "./report/monthlyJson.js";
 import { renderMonthlyTable } from "./report/monthlyTable.js";
 import { renderProfileReports } from "./report/profiles.js";
 import { renderTable } from "./report/table.js";
+
+/** @import { AggregateResult, MonthlyResult, PricingTable } from "./types.js" */
 
 // How reports name the bundled pricing file.
 const DEFAULT_PRICING_NAME = "pricing.config.json";
@@ -66,8 +68,16 @@ EXAMPLES
   claude-cost --since today --json
 `;
 
+/**
+ * Scan transcripts in `dirs`, drop duplicate snapshots and aggregate them.
+ *
+ * @param {string[]} dirs
+ * @param {{ pricing: PricingTable, since: Date | null, byModel: boolean, byMonth: boolean }} opts
+ * @returns {Promise<AggregateResult | MonthlyResult>}
+ */
 async function collectReport(dirs, { pricing, since, byModel, byMonth }) {
   async function* allEvents() {
+    /** @type {Set<string>} */
     const visited = new Set();
 
     for (const dir of dirs) {
@@ -86,23 +96,35 @@ async function collectReport(dirs, { pricing, since, byModel, byMonth }) {
   return aggregate(deduped, { pricing, since, byModel });
 }
 
+/**
+ * @param {AggregateResult | MonthlyResult} result
+ * @param {{ byMonth: boolean, byModel: boolean, since: Date | null, region: string, pricingFile: string, json: boolean }} opts
+ */
 function renderSingle(
   result,
   { byMonth, byModel, since, region, pricingFile, json },
 ) {
   if (byMonth) {
+    const monthly = /** @type {MonthlyResult} */ (result);
     const opts = { since, region, pricingFile };
-    if (json) renderMonthlyJson(result, opts);
-    else renderMonthlyTable(result, opts);
-    return;
+
+    return json
+      ? renderMonthlyJson(monthly, opts)
+      : renderMonthlyTable(monthly, opts);
   }
 
+  const totals = /** @type {AggregateResult} */ (result);
   const opts = { byModel, since, region, pricingFile };
 
-  if (json) renderJson(result, opts);
-  else renderTable(result, opts);
+  return json ? renderJson(totals, opts) : renderTable(totals, opts);
 }
 
+/** @param {string} text */
+function print(text) {
+  process.stdout.write(`${text}\n`);
+}
+
+/** @param {string[]} argv */
 export async function run(argv) {
   const { values } = parseArgs({
     args: argv,
@@ -169,12 +191,14 @@ export async function run(argv) {
       });
     }
 
-    renderProfileReports(reports, {
-      byModel,
-      byMonth,
-      since,
-      json: values.json,
-    });
+    print(
+      renderProfileReports(reports, {
+        byModel,
+        byMonth,
+        since,
+        json: values.json,
+      }),
+    );
 
     return;
   }
@@ -189,12 +213,14 @@ export async function run(argv) {
     byMonth,
   });
 
-  renderSingle(result, {
-    byModel,
-    byMonth,
-    json: values.json,
-    pricingFile: values.pricing || DEFAULT_PRICING_NAME,
-    region,
-    since,
-  });
+  print(
+    renderSingle(result, {
+      byModel,
+      byMonth,
+      json: values.json,
+      pricingFile: values.pricing || DEFAULT_PRICING_NAME,
+      region,
+      since,
+    }),
+  );
 }

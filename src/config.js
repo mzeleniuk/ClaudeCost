@@ -1,8 +1,13 @@
+// @ts-check
+import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import fs from "node:fs";
 
-/** Expand a leading ~ or ~/ to the user's home directory. */
+/**
+ * Expand a leading ~ or ~/ to the user's home directory.
+ *
+ * @param {string} p
+ */
 export function expandHome(p) {
   if (p === "~") return os.homedir();
   if (p.startsWith("~/")) return path.join(os.homedir(), p.slice(2));
@@ -13,12 +18,16 @@ export function expandHome(p) {
  * Candidate directories where Claude Code stores session transcripts.
  * Claude Code reads only CLAUDE_CONFIG_DIR when it is set, so we do too.
  * Otherwise: modern path first, then legacy.
+ *
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {string[]}
  */
 export function defaultTranscriptDirs(env = process.env) {
   const configDir = env.CLAUDE_CONFIG_DIR?.trim();
   if (configDir) return [path.join(expandHome(configDir), "projects")];
 
   const home = os.homedir();
+
   return [
     path.join(home, ".config", "claude", "projects"),
     path.join(home, ".claude", "projects"),
@@ -29,27 +38,38 @@ export function defaultTranscriptDirs(env = process.env) {
  * Resolve transcript directories to scan.
  * With --dir: a single explicit path.
  * Otherwise: every existing default projects dir (merged), deduped by realpath.
+ *
+ * @param {string | undefined} explicitDir
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {string[]}
  */
 export function resolveTranscriptDirs(explicitDir, env = process.env) {
   if (explicitDir) {
     const resolved = expandHome(explicitDir);
+
     if (!fs.existsSync(resolved)) {
       throw new Error(`transcript directory not found: ${explicitDir}`);
     }
+
     return [resolved];
   }
 
+  /** @type {string[]} */
   const found = [];
   const seen = new Set();
+
   for (const dir of defaultTranscriptDirs(env)) {
     if (!fs.existsSync(dir)) continue;
     let key = dir;
+
     try {
       key = fs.realpathSync(dir);
     } catch {
       // use the original path if realpath fails
     }
+
     if (seen.has(key)) continue;
+
     seen.add(key);
     found.push(dir);
   }

@@ -1,8 +1,14 @@
-import { sortedMonthKeys } from "../aggregateByMonth.js";
+// @ts-check
+import { sortedMonths } from "../aggregate.js";
+import { formatJson, roundCost } from "./format.js";
 
-import { roundCost } from "./format.js";
+/** @import { MonthlyResult, Totals } from "../types.js" */
 
-// Monthly totals for one scan, without the report envelope.
+/**
+ * Monthly totals for one scan, without the report envelope.
+ *
+ * @param {MonthlyResult} result
+ */
 export function buildMonthlyProfile({
   months,
   notInRegion,
@@ -10,14 +16,13 @@ export function buildMonthlyProfile({
   total,
   unknownModels,
 }) {
+  /** @type {Record<string, { models: Record<string, Totals>, total: Totals }>} */
   const byMonth = {};
 
-  for (const key of sortedMonthKeys(months)) {
-    const month = months.get(key);
-
+  for (const [key, month] of sortedMonths(months)) {
     byMonth[key] = {
       models: Object.fromEntries(
-        [...month.models].map(([model, b]) => [model, roundCost(b)]),
+        [...month.models].map(([model, totals]) => [model, roundCost(totals)]),
       ),
       total: roundCost(month.total),
     };
@@ -32,9 +37,16 @@ export function buildMonthlyProfile({
   };
 }
 
+/**
+ * JSON report for `aggregateByMonth` results.
+ *
+ * @param {MonthlyResult} result
+ * @param {{ since: Date | null, region?: string }} opts
+ */
 export function renderMonthlyJson(result, { since, region }) {
   const profile = buildMonthlyProfile(result);
-  const output = {
+
+  return formatJson({
     byMonth: profile.byMonth,
     generatedAt: new Date().toISOString(),
     groupedBy: "month-model",
@@ -44,7 +56,5 @@ export function renderMonthlyJson(result, { since, region }) {
     skippedUndated: profile.skippedUndated,
     total: profile.total,
     unknownModels: profile.unknownModels,
-  };
-
-  process.stdout.write(JSON.stringify(output, null, 2) + "\n");
+  });
 }

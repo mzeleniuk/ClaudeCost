@@ -24,6 +24,7 @@ test("matches model by substring", () => {
 
 test("flags unknown models", () => {
   const p = priceForModel(PRICING, "gpt-4");
+
   assert.equal(p._unknown, true);
   assert.equal(p.cacheWrite1h, 0);
 });
@@ -37,6 +38,7 @@ test("computes cost correctly", () => {
     input: 1_000_000,
     output: 1_000_000,
   });
+
   assert.equal(cost, 18.0); // 3 + 15
 });
 
@@ -128,6 +130,7 @@ test("flat cache write uses cacheWrite rate", () => {
     input: 0,
     output: 0,
   });
+
   assert.equal(cost, 4.05); // 3.75 + 0.30
 });
 
@@ -142,6 +145,7 @@ test("breakdown prices 5m and 1h separately", () => {
     input: 0,
     output: 0,
   });
+
   assert.equal(cost, 9.75); // 3.75 + 6.0
 });
 
@@ -255,6 +259,26 @@ test("loadPricing rejects an invalid longContext threshold", () => {
     assert.throws(
       () => loadPricing(file),
       /longContext.*"output" must be a number/,
+    );
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("loadPricing names the file when it is not valid JSON", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-"));
+  const file = path.join(dir, "pricing.json");
+
+  try {
+    fs.writeFileSync(file, "{ nope");
+    assert.throws(
+      () => loadPricing(file),
+      /invalid pricing file \(expected JSON\): .*pricing\.json/,
+    );
+    fs.writeFileSync(file, "[]");
+    assert.throws(
+      () => loadPricing(file),
+      /invalid pricing file \(expected object\)/,
     );
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

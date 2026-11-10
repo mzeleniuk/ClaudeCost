@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { aggregateByMonth, sortedMonthKeys } from "../src/aggregateByMonth.js";
+import { aggregateByMonth, sortedMonths } from "../src/aggregate.js";
 
 const PRICING = {
   "claude-sonnet-4": {
@@ -54,6 +54,7 @@ test("groups events by month and model", async () => {
   const { months, total } = await aggregateByMonth(events, {
     pricing: PRICING,
   });
+
   assert.equal(months.size, 2);
   assert.equal(total.messages, 3);
   assert.equal(total.costUSD, 3.0 + 3.0 + 15.0);
@@ -68,7 +69,7 @@ test("groups events by month and model", async () => {
 });
 
 // Local dates: months are bucketed in local time.
-test("sortedMonthKeys returns ascending order", async () => {
+test("sortedMonths returns ascending order", async () => {
   const events = mockEvents([
     {
       ts: new Date(2025, 2, 1),
@@ -88,7 +89,10 @@ test("sortedMonthKeys returns ascending order", async () => {
   ]);
 
   const { months } = await aggregateByMonth(events, { pricing: PRICING });
-  assert.deepEqual(sortedMonthKeys(months), ["2025-01", "2025-02", "2025-03"]);
+  assert.deepEqual(
+    sortedMonths(months).map(([key]) => key),
+    ["2025-01", "2025-02", "2025-03"],
+  );
 });
 
 test("respects --since filter", async () => {

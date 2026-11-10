@@ -1,19 +1,34 @@
+// @ts-check
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 
-/** Recursively yield all *.jsonl files under a directory. */
+import { isPlainObject } from "./validate.js";
+
+/** @import { Usage, UsageEvent } from "./types.js" */
+
+/**
+ * Recursively yield all *.jsonl files under a directory.
+ * `visited` holds real paths already scanned, so symlink cycles end.
+ *
+ * @param {string} dir
+ * @param {Set<string>} [visited]
+ * @returns {AsyncGenerator<string>}
+ */
 export async function* findTranscripts(dir, visited = new Set()) {
   let realDir;
+
   try {
     realDir = await fs.promises.realpath(dir);
   } catch {
     return;
   }
+
   if (visited.has(realDir)) return;
   visited.add(realDir);
 
   let entries;
+
   try {
     entries = await fs.promises.readdir(dir, { withFileTypes: true });
   } catch {
@@ -22,16 +37,18 @@ export async function* findTranscripts(dir, visited = new Set()) {
 
   for (const entry of entries) {
     const full = path.join(dir, entry.name);
+
     if (entry.isDirectory()) {
       yield* findTranscripts(full, visited);
     } else if (entry.isFile() && entry.name.endsWith(".jsonl")) {
       yield full;
     } else if (entry.isSymbolicLink()) {
       try {
-        const st = await fs.promises.stat(full);
-        if (st.isDirectory()) {
+        const stats = await fs.promises.stat(full);
+
+        if (stats.isDirectory()) {
           yield* findTranscripts(full, visited);
-        } else if (st.isFile() && entry.name.endsWith(".jsonl")) {
+        } else if (stats.isFile() && entry.name.endsWith(".jsonl")) {
           yield full;
         }
       } catch {
@@ -44,6 +61,9 @@ export async function* findTranscripts(dir, visited = new Set()) {
 /**
  * Normalize Anthropic usage into a flat shape for aggregation/pricing.
  * Prefers cache_creation 5m/1h breakdown when present.
+ *
+ * @param {any} [raw] `usage` object from a transcript record.
+ * @returns {Usage}
  */
 export function normalizeUsage(raw = {}) {
   const breakdown = raw.cache_creation;
@@ -70,6 +90,7 @@ export function normalizeUsage(raw = {}) {
   };
 }
 
+/** @param {Usage} usage */
 function hasBillableTokens(usage) {
   return (
     usage.input > 0 ||
@@ -82,35 +103,40 @@ function hasBillableTokens(usage) {
 /**
  * Extract advisor_message iterations from usage.
  * Other iteration types are ignored; top-level usage stays on the main model.
- * @returns {{ model: string, usage: object }[]}
+ *
+ * @param {any} [raw]
+ * @returns {{ model: string, usage: Usage }[]}
  */
 export function advisorUsagesFromRaw(raw = {}) {
   const iterations = raw.iterations;
   if (!Array.isArray(iterations) || iterations.length === 0) return [];
 
   const advisors = [];
+
   for (const iteration of iterations) {
-    if (iteration == null || typeof iteration !== "object") continue;
+    if (!isPlainObject(iteration)) continue;
     if (iteration.type !== "advisor_message") continue;
+
     const model = iteration.model;
     if (typeof model !== "string" || model.length === 0) continue;
-    advisors.push({
-      model,
-      usage: normalizeUsage(iteration),
-    });
+
+    advisors.push({ model, usage: normalizeUsage(iteration) });
   }
+
   return advisors;
 }
 
 /**
  * Stream a JSONL transcript and yield normalized usage events.
- * Each yielded record: { ts, model, usage, messageId, requestId, file }
  *
  * Advisor iterations (type advisor_message) are yielded as separate events
  * under the advisor model, with messageId `{id}:advisor:{index}` when the
  * parent has an id.
  *
  * Streaming line-by-line keeps memory flat even for very large transcripts.
+ *
+ * @param {string} file
+ * @returns {AsyncGenerator<UsageEvent>}
  */
 export async function* readUsageEvents(file) {
   const rl = readline.createInterface({
@@ -126,14 +152,15 @@ export async function* readUsageEvents(file) {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    let rec;
+    let record;
+
     try {
-      rec = JSON.parse(trimmed);
+      record = JSON.parse(trimmed);
     } catch {
       continue; // tolerate partial/corrupt lines
     }
 
-    const msg = rec.message ?? rec;
+    const msg = record.message ?? record;
     const rawUsage = msg?.usage;
     if (!rawUsage) continue;
 
@@ -141,16 +168,16 @@ export async function* readUsageEvents(file) {
     const advisors = advisorUsagesFromRaw(rawUsage);
     if (!hasBillableTokens(usage) && advisors.length === 0) continue;
 
-    const tsRaw = rec.timestamp || rec.ts || msg?.timestamp;
+    const tsRaw = record.timestamp || record.ts || msg?.timestamp;
     const tsDate = tsRaw ? new Date(tsRaw) : null;
     const ts = tsDate && !Number.isNaN(tsDate.getTime()) ? tsDate : null;
     const messageId = msg.id || null;
-    const requestId = rec.requestId || null;
+    const requestId = record.requestId || null;
 
     if (hasBillableTokens(usage)) {
       yield {
         ts,
-        model: msg.model || rec.model || "unknown",
+        model: msg.model || record.model || "unknown",
         usage,
         messageId,
         requestId,
@@ -158,8 +185,7 @@ export async function* readUsageEvents(file) {
       };
     }
 
-    for (let index = 0; index < advisors.length; index++) {
-      const advisor = advisors[index];
+    for (const [index, advisor] of advisors.entries()) {
       if (!hasBillableTokens(advisor.usage)) continue;
       yield {
         ts,

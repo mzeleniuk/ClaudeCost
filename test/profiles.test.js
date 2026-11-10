@@ -3,15 +3,10 @@ import assert from "node:assert/strict";
 import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
-import { fileURLToPath } from "node:url";
 
 import { loadProfiles } from "../src/profiles.js";
 
-const fixture = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "fixtures",
-  "profile-sample",
-);
+const fixture = path.join(import.meta.dirname, "fixtures", "profile-sample");
 
 function writeProfiles(dir, body) {
   const file = path.join(dir, "profiles.config.json");
@@ -132,6 +127,7 @@ test("loadProfiles reads an optional region and rejects unknown ones", () => {
 function makeConfigDir(...parts) {
   const dir = path.join(...parts);
   fs.mkdirSync(path.join(dir, "projects"), { recursive: true });
+
   return dir;
 }
 

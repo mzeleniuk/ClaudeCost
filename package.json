@@ -1,6 +1,6 @@
 {
   "name": "claude-cost",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "Approximate local cost tracking for Claude Code (Vertex AI) by parsing session transcripts.",
   "type": "module",
@@ -24,7 +24,8 @@
     "lint": "for f in bin/*.js src/*.js src/report/*.js; do node --check \"$f\"; done",
     "monthly": "node bin/claude-cost.js --monthly --by-model",
     "start": "node bin/claude-cost.js",
-    "test": "node --test"
+    "test": "node --test",
+    "typecheck": "tsc -p jsconfig.json"
   },
   "keywords": [
     "claude-code",
@@ -38,5 +39,9 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mzeleniuk/ClaudeCost.git"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^7.0.2"
   }
 }

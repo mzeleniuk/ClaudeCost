@@ -1,4 +1,12 @@
-// Token and cost totals for a group of messages
+// @ts-check
+
+/** @import { Totals, Usage } from "./types.js" */
+
+/**
+ * Token and cost totals for a group of messages.
+ *
+ * @returns {Totals}
+ */
 export function emptyTotals() {
   return {
     inputTokens: 0,
@@ -10,7 +18,13 @@ export function emptyTotals() {
   };
 }
 
-// Add one message's normalized usage and cost to `totals`
+/**
+ * Add one message's normalized usage and cost to `totals`.
+ *
+ * @param {Totals} totals
+ * @param {Partial<Usage>} usage
+ * @param {number} cost
+ */
 export function addUsage(totals, usage, cost) {
   totals.inputTokens += usage.input ?? 0;
   totals.outputTokens += usage.output ?? 0;
@@ -20,12 +34,17 @@ export function addUsage(totals, usage, cost) {
   totals.messages += 1;
 }
 
-// Sum several totals into a new one
+/**
+ * Sum several totals into a new one.
+ *
+ * @param {Totals[]} list
+ */
 export function sumTotals(list) {
   const sum = emptyTotals();
+  const keys = /** @type {(keyof Totals)[]} */ (Object.keys(sum));
 
   for (const totals of list) {
-    for (const key of Object.keys(sum)) sum[key] += totals[key] ?? 0;
+    for (const key of keys) sum[key] += totals[key] ?? 0;
   }
 
   return sum;
