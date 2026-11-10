@@ -60,21 +60,21 @@ export async function* findTranscripts(dir, visited = new Set()) {
 
 /**
  * Normalize Anthropic usage into a flat shape for aggregation/pricing.
- * Prefers cache_creation 5m/1h breakdown when present.
+ * Prefers cache_creation 5m/1h breakdown when present. An empty or all-zero
+ * breakdown says nothing about the split, so the flat
+ * cache_creation_input_tokens count is used instead of dropping it.
  *
  * @param {any} [raw] `usage` object from a transcript record.
  * @returns {Usage}
  */
 export function normalizeUsage(raw = {}) {
-  const breakdown = raw.cache_creation;
-  const hasBreakdown = breakdown != null && typeof breakdown === "object";
+  const breakdown = isPlainObject(raw.cache_creation) ? raw.cache_creation : {};
+  const breakdown5m = breakdown.ephemeral_5m_input_tokens ?? 0;
+  const breakdown1h = breakdown.ephemeral_1h_input_tokens ?? 0;
+  const hasBreakdown = breakdown5m + breakdown1h > 0;
 
-  const cacheWrite5m = hasBreakdown
-    ? (breakdown.ephemeral_5m_input_tokens ?? 0)
-    : 0;
-  const cacheWrite1h = hasBreakdown
-    ? (breakdown.ephemeral_1h_input_tokens ?? 0)
-    : 0;
+  const cacheWrite5m = hasBreakdown ? breakdown5m : 0;
+  const cacheWrite1h = hasBreakdown ? breakdown1h : 0;
   const cacheWrite = hasBreakdown
     ? cacheWrite5m + cacheWrite1h
     : (raw.cache_creation_input_tokens ?? 0);

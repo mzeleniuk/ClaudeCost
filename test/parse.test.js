@@ -84,6 +84,22 @@ test("normalizeUsage falls back to flat cache_creation_input_tokens", () => {
   assert.equal(u.cacheWrite, 50);
 });
 
+test("normalizeUsage uses the flat count when the breakdown is empty", () => {
+  for (const cache_creation of [
+    {},
+    { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 0 },
+  ]) {
+    const u = normalizeUsage({
+      cache_creation_input_tokens: 1_000_000,
+      cache_creation,
+    });
+    assert.equal(u.hasCacheBreakdown, false);
+    assert.equal(u.cacheWrite5m, null);
+    assert.equal(u.cacheWrite1h, null);
+    assert.equal(u.cacheWrite, 1_000_000);
+  }
+});
+
 test("readUsageEvents normalizes cache breakdown from sample", async () => {
   const events = [];
   for await (const ev of readUsageEvents(SAMPLE)) events.push(ev);
