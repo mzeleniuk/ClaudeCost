@@ -1,7 +1,6 @@
 // @ts-check
 import fs from "node:fs";
 import path from "node:path";
-import readline from "node:readline";
 
 import { isPlainObject } from "./validate.js";
 
@@ -126,6 +125,70 @@ export function advisorUsagesFromRaw(raw = {}) {
   return advisors;
 }
 
+const NEWLINE = 0x0a;
+const USAGE_KEY = Buffer.from('"usage"');
+const READ_CHUNK_BYTES = 1024 * 1024;
+
+/**
+ * Yield every line in `buf` that contains the literal "usage", decoded.
+ * `buf` must end on a line boundary or at the end of the file.
+ *
+ * @param {Buffer} buf
+ * @returns {Generator<string>}
+ */
+function* usageLinesIn(buf) {
+  let at = buf.indexOf(USAGE_KEY);
+
+  while (at !== -1) {
+    const start = buf.lastIndexOf(NEWLINE, at) + 1;
+    let end = buf.indexOf(NEWLINE, at);
+    if (end === -1) end = buf.length;
+
+    yield buf.toString("utf8", start, end);
+    at = buf.indexOf(USAGE_KEY, end);
+  }
+}
+
+/**
+ * Stream a file and yield only the lines that contain the literal "usage".
+ *
+ * Most lines are tool output and chat text with no usage. A usage key is
+ * always written as the literal "usage", so this searches raw bytes for it
+ * and decodes only the matching lines. Splitting on the newline byte is safe
+ * in UTF-8 because it never appears inside a multi-byte character.
+ *
+ * @param {string} file
+ * @returns {AsyncGenerator<string>}
+ */
+async function* readUsageLines(file) {
+  const stream = fs.createReadStream(file, {
+    highWaterMark: READ_CHUNK_BYTES,
+  });
+
+  // Chunks since the last newline. Joined only once a newline arrives, so a
+  // line longer than one chunk is copied once instead of once per chunk.
+  /** @type {Buffer[]} */
+  let pending = [];
+
+  for await (const chunk of stream) {
+    const lastNewline = chunk.lastIndexOf(NEWLINE);
+
+    if (lastNewline === -1) {
+      pending.push(chunk);
+      continue;
+    }
+
+    const head = chunk.subarray(0, lastNewline + 1);
+    const complete = pending.length ? Buffer.concat([...pending, head]) : head;
+
+    yield* usageLinesIn(complete);
+    pending =
+      lastNewline + 1 < chunk.length ? [chunk.subarray(lastNewline + 1)] : [];
+  }
+
+  if (pending.length) yield* usageLinesIn(Buffer.concat(pending));
+}
+
 /**
  * Stream a JSONL transcript and yield normalized usage events.
  *
@@ -133,22 +196,14 @@ export function advisorUsagesFromRaw(raw = {}) {
  * under the advisor model, with messageId `{id}:advisor:{index}` when the
  * parent has an id.
  *
- * Streaming line-by-line keeps memory flat even for very large transcripts.
+ * The file is read in chunks, so memory stays flat even for very large
+ * transcripts.
  *
  * @param {string} file
  * @returns {AsyncGenerator<UsageEvent>}
  */
 export async function* readUsageEvents(file) {
-  const rl = readline.createInterface({
-    input: fs.createReadStream(file, { encoding: "utf8" }),
-    crlfDelay: Infinity,
-  });
-
-  for await (const line of rl) {
-    // Most lines are tool output and chat text with no usage. A usage key is
-    // always written as the literal "usage", so skip the rest before parsing.
-    if (!line.includes('"usage"')) continue;
-
+  for await (const line of readUsageLines(file)) {
     const trimmed = line.trim();
     if (!trimmed) continue;
 

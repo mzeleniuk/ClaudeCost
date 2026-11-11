@@ -227,6 +227,68 @@ test("readUsageEvents skips lines without a usage key", async () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+test("readUsageEvents reads lines longer than one read chunk", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-parse-"));
+  const file = path.join(dir, "session.jsonl");
+  // Bigger than the 1 MiB read chunk, with multi-byte characters, so lines
+  // and the "usage" key cross chunk boundaries.
+  const text = "żółw 🐢 ".repeat(300_000);
+
+  fs.writeFileSync(
+    file,
+    [
+      JSON.stringify({ type: "user", message: { content: text } }),
+      JSON.stringify({
+        message: {
+          id: "m-long",
+          model: "claude-opus-5-5",
+          content: text,
+          usage: { input_tokens: 11, output_tokens: 3 },
+        },
+      }),
+      JSON.stringify({
+        message: { id: "m-short", usage: { input_tokens: 5 } },
+      }),
+    ].join("\n") + "\n",
+  );
+
+  const events = [];
+  for await (const ev of readUsageEvents(file)) events.push(ev);
+
+  assert.deepEqual(
+    events.map((ev) => [ev.messageId, ev.usage.input]),
+    [
+      ["m-long", 11],
+      ["m-short", 5],
+    ],
+  );
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("readUsageEvents handles CRLF and a missing final newline", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-parse-"));
+  const file = path.join(dir, "session.jsonl");
+
+  fs.writeFileSync(
+    file,
+    [
+      '{"message": {"id": "m1", "usage": {"input_tokens": 1}}}',
+      '{"message": {"id": "m2", "usage": {"input_tokens": 2}}}',
+    ].join("\r\n"),
+  );
+
+  const events = [];
+  for await (const ev of readUsageEvents(file)) events.push(ev);
+
+  assert.deepEqual(
+    events.map((ev) => ev.messageId),
+    ["m1", "m2"],
+  );
+
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test("findTranscripts discovers jsonl files recursively", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-parse-"));
   const nested = path.join(root, "proj", "nested");
