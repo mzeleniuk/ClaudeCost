@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { isPlainObject } from "./validate.js";
 
-/** @import { Usage, UsageEvent } from "./types.js" */
+/** @import { Usage, UsageEvent, UsageRecord } from "./types.js" */
 
 /**
  * Recursively yield all *.jsonl files under a directory.
@@ -150,25 +150,124 @@ function* usageLinesIn(buf) {
 }
 
 /**
- * Stream a file and yield only the lines that contain the literal "usage".
+ * The fields pricing reads from one transcript line, as written. Returns null
+ * for lines that are not JSON or have no usage object.
+ *
+ * @param {string} line
+ * @returns {UsageRecord | null}
+ */
+export function parseUsageRecord(line) {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+
+  let record;
+
+  try {
+    record = JSON.parse(trimmed);
+  } catch {
+    return null; // tolerate partial/corrupt lines
+  }
+
+  if (!isPlainObject(record)) return null;
+
+  const msg = record.message ?? record;
+  if (!isPlainObject(msg) || !isPlainObject(msg.usage)) return null;
+
+  return {
+    id: msg.id || null,
+    model: msg.model || record.model || null,
+    requestId: record.requestId || null,
+    ts: record.timestamp || record.ts || msg.timestamp || null,
+    usage: msg.usage,
+  };
+}
+
+/**
+ * Normalized usage events for one record. Advisor iterations (type
+ * advisor_message) become separate events under the advisor model, with
+ * messageId `{id}:advisor:{index}` when the parent has an id.
+ *
+ * @param {UsageRecord} record
+ * @param {string} file
+ * @returns {UsageEvent[]}
+ */
+export function eventsFromRecord(record, file) {
+  const usage = normalizeUsage(record.usage);
+  const advisors = advisorUsagesFromRaw(record.usage);
+  const tsDate = record.ts ? new Date(record.ts) : null;
+  const ts = tsDate && !Number.isNaN(tsDate.getTime()) ? tsDate : null;
+  const messageId = record.id;
+  const requestId = record.requestId;
+  const events = [];
+
+  if (hasBillableTokens(usage)) {
+    events.push({
+      file,
+      messageId,
+      model: record.model || "unknown",
+      requestId,
+      ts,
+      usage,
+    });
+  }
+
+  for (const [index, advisor] of advisors.entries()) {
+    if (!hasBillableTokens(advisor.usage)) continue;
+
+    events.push({
+      file,
+      messageId: messageId != null ? `${messageId}:advisor:${index}` : null,
+      model: advisor.model,
+      requestId,
+      ts,
+      usage: advisor.usage,
+    });
+  }
+
+  return events;
+}
+
+/**
+ * Read `file` from byte `start` and collect the usage records on its lines.
  *
  * Most lines are tool output and chat text with no usage. A usage key is
  * always written as the literal "usage", so this searches raw bytes for it
  * and decodes only the matching lines. Splitting on the newline byte is safe
  * in UTF-8 because it never appears inside a multi-byte character.
  *
+ * `end` is the byte offset just past the last newline. Records from a final
+ * line with no newline go in `tail`, because Claude Code may still be
+ * writing that line.
+ *
  * @param {string} file
- * @returns {AsyncGenerator<string>}
+ * @param {number} [start] Byte offset where a line begins.
+ * @returns {Promise<{ records: UsageRecord[], tail: UsageRecord[], end: number }>}
  */
-async function* readUsageLines(file) {
+export async function scanUsageRecords(file, start = 0) {
   const stream = fs.createReadStream(file, {
     highWaterMark: READ_CHUNK_BYTES,
+    start,
   });
+
+  /** @type {UsageRecord[]} */
+  const records = [];
+  let end = start;
 
   // Chunks since the last newline. Joined only once a newline arrives, so a
   // line longer than one chunk is copied once instead of once per chunk.
   /** @type {Buffer[]} */
   let pending = [];
+
+  /**
+   * @param {Buffer} buf
+   * @param {UsageRecord[]} into
+   */
+  const collect = (buf, into) => {
+    for (const line of usageLinesIn(buf)) {
+      const record = parseUsageRecord(line);
+      if (record) into.push(record);
+    }
+  };
 
   for await (const chunk of stream) {
     const lastNewline = chunk.lastIndexOf(NEWLINE);
@@ -181,75 +280,32 @@ async function* readUsageLines(file) {
     const head = chunk.subarray(0, lastNewline + 1);
     const complete = pending.length ? Buffer.concat([...pending, head]) : head;
 
-    yield* usageLinesIn(complete);
+    collect(complete, records);
+    end += complete.length;
     pending =
       lastNewline + 1 < chunk.length ? [chunk.subarray(lastNewline + 1)] : [];
   }
 
-  if (pending.length) yield* usageLinesIn(Buffer.concat(pending));
+  /** @type {UsageRecord[]} */
+  const tail = [];
+  if (pending.length) collect(Buffer.concat(pending), tail);
+
+  return { records, tail, end };
 }
 
 /**
- * Stream a JSONL transcript and yield normalized usage events.
+ * Read a JSONL transcript and yield normalized usage events.
  *
- * Advisor iterations (type advisor_message) are yielded as separate events
- * under the advisor model, with messageId `{id}:advisor:{index}` when the
- * parent has an id.
- *
- * The file is read in chunks, so memory stays flat even for very large
- * transcripts.
+ * The file is read in chunks, so memory grows with the number of usage
+ * records, not with the size of the transcript.
  *
  * @param {string} file
  * @returns {AsyncGenerator<UsageEvent>}
  */
 export async function* readUsageEvents(file) {
-  for await (const line of readUsageLines(file)) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
+  const { records, tail } = await scanUsageRecords(file);
 
-    let record;
-
-    try {
-      record = JSON.parse(trimmed);
-    } catch {
-      continue; // tolerate partial/corrupt lines
-    }
-
-    const msg = record.message ?? record;
-    const rawUsage = msg?.usage;
-    if (!rawUsage) continue;
-
-    const usage = normalizeUsage(rawUsage);
-    const advisors = advisorUsagesFromRaw(rawUsage);
-    if (!hasBillableTokens(usage) && advisors.length === 0) continue;
-
-    const tsRaw = record.timestamp || record.ts || msg?.timestamp;
-    const tsDate = tsRaw ? new Date(tsRaw) : null;
-    const ts = tsDate && !Number.isNaN(tsDate.getTime()) ? tsDate : null;
-    const messageId = msg.id || null;
-    const requestId = record.requestId || null;
-
-    if (hasBillableTokens(usage)) {
-      yield {
-        ts,
-        model: msg.model || record.model || "unknown",
-        usage,
-        messageId,
-        requestId,
-        file,
-      };
-    }
-
-    for (const [index, advisor] of advisors.entries()) {
-      if (!hasBillableTokens(advisor.usage)) continue;
-      yield {
-        ts,
-        model: advisor.model,
-        usage: advisor.usage,
-        messageId: messageId != null ? `${messageId}:advisor:${index}` : null,
-        requestId,
-        file,
-      };
-    }
+  for (const record of [...records, ...tail]) {
+    yield* eventsFromRecord(record, file);
   }
 }

@@ -17,6 +17,13 @@ test("rejects --by-model together with --by-month", async () => {
   );
 });
 
+test("rejects --no-cache together with --rebuild-cache", async () => {
+  await assert.rejects(
+    run(["--no-cache", "--rebuild-cache"]),
+    /use either --no-cache or --rebuild-cache, not both/,
+  );
+});
+
 test("rejects an invalid --since before scanning anything", async () => {
   await assert.rejects(run(["--since", "1"]), /invalid --since value: "1"/);
 });
@@ -108,6 +115,7 @@ async function cli(args) {
     pricing,
     "--region",
     "global",
+    "--no-cache",
     ...args,
   ]);
 

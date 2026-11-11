@@ -1,3 +1,4 @@
 {
-  "region": "global"
+  "region": "global",
+  "storeDir": "./data"
 }

@@ -4,6 +4,7 @@ import { bold, byCostDesc, dim, fmtNum, fmtUSD, renderGrid } from "./format.js";
 import {
   EMPTY_LINE,
   INDENT,
+  archiveLines,
   headingLines,
   noteLines,
   scopeLine,
@@ -65,6 +66,7 @@ export function renderMonthlyTable(
     );
   }
 
+  lines.push(...archiveLines(result));
   lines.push(...warningLines(result, { region, pricingFile }));
 
   if (showNote) lines.push(...noteLines());

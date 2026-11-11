@@ -10,10 +10,11 @@ import { formatJson, roundCost } from "./format.js";
  * @param {{ byModel: boolean }} opts
  */
 export function buildUsageProfile(
-  { groups, notInRegion, total, unknownModels },
+  { archivedTranscripts, groups, notInRegion, total, unknownModels },
   { byModel },
 ) {
   return {
+    archivedTranscripts,
     notInRegion,
     total: roundCost(total),
     unknownModels,
@@ -35,6 +36,7 @@ export function renderJson(result, { byModel, since, region }) {
   const profile = buildUsageProfile(result, { byModel });
 
   return formatJson({
+    archivedTranscripts: profile.archivedTranscripts,
     generatedAt: new Date().toISOString(),
     groupedBy: byModel ? "model" : "none",
     notInRegion: profile.notInRegion,

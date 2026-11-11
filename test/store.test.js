@@ -1,0 +1,265 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+
+import { aggregate } from "../src/aggregate.js";
+import { dedupeEvents } from "../src/dedupe.js";
+import {
+  STORE_VERSION,
+  readStoredEvents,
+  storeFileName,
+} from "../src/store.js";
+
+/**
+ * A transcript directory, a store directory, and helpers to read through the
+ * store and to find its file.
+ */
+function setup() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-store-"));
+  const projects = path.join(root, "projects");
+  const storeDir = path.join(root, "data");
+  fs.mkdirSync(path.join(projects, "proj"), { recursive: true });
+
+  const warnings = [];
+  const read = (opts = {}) =>
+    readStoredEvents(projects, {
+      storeDir,
+      warn: (message) => warnings.push(message),
+      ...opts,
+    });
+  const storeFile = () =>
+    path.join(storeDir, storeFileName(fs.realpathSync.native(projects)));
+  const readStore = () => JSON.parse(fs.readFileSync(storeFile(), "utf8"));
+  const transcript = (name) => path.join(projects, "proj", name);
+
+  return {
+    root,
+    storeDir,
+    read,
+    storeFile,
+    readStore,
+    transcript,
+    warnings,
+  };
+}
+
+/**
+ * One transcript line with usage.
+ *
+ * @param {string} id
+ * @param {number} input
+ */
+const line = (id, input) =>
+  JSON.stringify({
+    timestamp: "2026-10-01T12:00:00.000Z",
+    requestId: `req-${id}`,
+    message: { id, model: "claude-opus-5-5", usage: { input_tokens: input } },
+  });
+
+/** @param {{ messageId: string | null, usage: { input: number } }[]} events */
+const summary = (events) =>
+  events.map((event) => [event.messageId, event.usage.input]);
+
+test("storeFileName is a readable slug plus a hash of the path", () => {
+  const name = storeFileName(path.join(os.homedir(), ".claude", "projects"));
+  assert.match(name, /^claude-projects-[0-9a-f]{8}\.json$/);
+
+  const other = storeFileName(path.join(os.homedir(), "claude", "projects"));
+  assert.match(other, /^claude-projects-[0-9a-f]{8}\.json$/);
+  assert.notEqual(name, other);
+
+  assert.match(storeFileName("/srv/x y/projects"), /^srv-x-y-projects-/);
+});
+
+test("saves records and reuses them while the file is unchanged", async (t) => {
+  const s = setup();
+  t.after(() => fs.rmSync(s.root, { recursive: true, force: true }));
+  const file = s.transcript("a.jsonl");
+
+  // A whole-second mtime, so utimesSync can set exactly the same one later.
+  const mtime = new Date("2026-10-01T12:00:00Z");
+  fs.writeFileSync(file, `${line("m1", 10)}\n${line("m2", 20)}\n`);
+  fs.utimesSync(file, mtime, mtime);
+  assert.deepEqual(summary(await s.read()), [
+    ["m1", 10],
+    ["m2", 20],
+  ]);
+
+  const store = s.readStore();
+  assert.equal(store.version, STORE_VERSION);
+  assert.equal(store.files[path.join("proj", "a.jsonl")].records.length, 2);
+
+  // Same size and mtime, different bytes: the store must not read it again.
+  fs.writeFileSync(file, `${line("m1", 90)}\n${line("m2", 80)}\n`);
+  fs.utimesSync(file, mtime, mtime);
+
+  assert.deepEqual(summary(await s.read()), [
+    ["m1", 10],
+    ["m2", 20],
+  ]);
+});
+
+test("reads only appended lines and rereads a rewritten file", async (t) => {
+  const s = setup();
+  t.after(() => fs.rmSync(s.root, { recursive: true, force: true }));
+  const file = s.transcript("a.jsonl");
+
+  fs.writeFileSync(file, `${line("m1", 10)}\n`);
+  await s.read();
+
+  fs.appendFileSync(file, `${line("m2", 20)}\n`);
+  assert.deepEqual(summary(await s.read()), [
+    ["m1", 10],
+    ["m2", 20],
+  ]);
+
+  const entry = s.readStore().files[path.join("proj", "a.jsonl")];
+  assert.equal(entry.offset, fs.statSync(file).size);
+
+  // Longer, but the old bytes changed: not an append, so read it all.
+  fs.writeFileSync(file, `${line("m9", 99)}\n${line("m8", 88)}\n`);
+  assert.deepEqual(summary(await s.read()), [
+    ["m9", 99],
+    ["m8", 88],
+  ]);
+
+  // Shorter: read it all.
+  fs.writeFileSync(file, `${line("m7", 7)}\n`);
+  assert.deepEqual(summary(await s.read()), [["m7", 7]]);
+});
+
+test("counts a half-written last line once, before and after it ends", async (t) => {
+  const s = setup();
+  t.after(() => fs.rmSync(s.root, { recursive: true, force: true }));
+  const file = s.transcript("a.jsonl");
+
+  fs.writeFileSync(file, `${line("m1", 10)}\n${line("m2", 20)}`);
+  assert.deepEqual(summary(await s.read()), [
+    ["m1", 10],
+    ["m2", 20],
+  ]);
+
+  const entry = s.readStore().files[path.join("proj", "a.jsonl")];
+  assert.equal(entry.records.length, 1, "the unfinished line is not saved");
+
+  fs.appendFileSync(file, `\n${line("m3", 30)}\n`);
+  assert.deepEqual(summary(await s.read()), [
+    ["m1", 10],
+    ["m2", 20],
+    ["m3", 30],
+  ]);
+});
+
+test("keeps usage from deleted transcripts, also through a rebuild", async (t) => {
+  const s = setup();
+  t.after(() => fs.rmSync(s.root, { recursive: true, force: true }));
+  const kept = s.transcript("kept.jsonl");
+  const gone = s.transcript("gone.jsonl");
+
+  fs.writeFileSync(kept, `${line("m1", 10)}\n`);
+  fs.writeFileSync(gone, `${line("m2", 20)}\n`);
+  await s.read();
+  fs.rmSync(gone);
+
+  for (const rebuild of [false, true]) {
+    const events = await s.read({ rebuild });
+    const archived = events.find((event) => event.messageId === "m2");
+
+    assert.equal(events.length, 2);
+    assert.equal(archived?.archived, true);
+    assert.equal(archived?.file, gone);
+  }
+
+  const entry = s.readStore().files[path.join("proj", "gone.jsonl")];
+  assert.equal(typeof entry.deletedAt, "string");
+
+  // Back on disk: no longer archived.
+  fs.writeFileSync(gone, `${line("m2", 20)}\n`);
+  const events = await s.read();
+  assert.equal(
+    events.some((event) => event.archived),
+    false,
+  );
+  assert.equal(
+    s.readStore().files[path.join("proj", "gone.jsonl")].deletedAt,
+    undefined,
+  );
+});
+
+test("archived and live copies of a message are deduped and counted", async (t) => {
+  const s = setup();
+  t.after(() => fs.rmSync(s.root, { recursive: true, force: true }));
+  const old = s.transcript("old.jsonl");
+
+  // A resumed session copies m1 into the new transcript.
+  fs.writeFileSync(old, `${line("m1", 10)}\n${line("m2", 20)}\n`);
+  fs.writeFileSync(s.transcript("new.jsonl"), `${line("m1", 10)}\n`);
+  await s.read();
+  fs.rmSync(old);
+
+  const events = await dedupeEvents(await s.read());
+  assert.deepEqual(summary(events).sort(), [
+    ["m1", 10],
+    ["m2", 20],
+  ]);
+
+  const result = await aggregate(events, { pricing: {} });
+  assert.equal(result.total.messages, 2);
+  assert.equal(result.archivedTranscripts, 1);
+});
+
+test("moves an unreadable store aside and rebuilds it", async (t) => {
+  const s = setup();
+  t.after(() => fs.rmSync(s.root, { recursive: true, force: true }));
+
+  fs.writeFileSync(s.transcript("a.jsonl"), `${line("m1", 10)}\n`);
+  fs.mkdirSync(s.storeDir);
+  fs.writeFileSync(s.storeFile(), "{ not json");
+
+  assert.deepEqual(summary(await s.read()), [["m1", 10]]);
+  assert.equal(s.warnings.length, 1);
+  assert.match(s.warnings[0], /unreadable\. Moved it to .*\.corrupt-/);
+
+  const names = fs.readdirSync(s.storeDir);
+  assert.equal(names.filter((n) => n.includes(".corrupt-")).length, 1);
+  assert.equal(s.readStore().version, STORE_VERSION);
+});
+
+test("refuses a store written by a newer version", async (t) => {
+  const s = setup();
+  t.after(() => fs.rmSync(s.root, { recursive: true, force: true }));
+  const newer = JSON.stringify({ version: STORE_VERSION + 1, files: {} });
+
+  fs.mkdirSync(s.storeDir);
+  fs.writeFileSync(s.storeFile(), newer);
+
+  await assert.rejects(s.read(), /written by a newer claude-cost/);
+  assert.equal(fs.readFileSync(s.storeFile(), "utf8"), newer);
+});
+
+test("a stored record is priced again by the current parser", async (t) => {
+  const s = setup();
+  t.after(() => fs.rmSync(s.root, { recursive: true, force: true }));
+  const file = s.transcript("a.jsonl");
+
+  fs.writeFileSync(file, `${line("m1", 10)}\n`);
+  await s.read();
+  fs.rmSync(file);
+
+  // The store keeps the raw usage object, not normalized numbers, so a
+  // stored cache_creation breakdown is still read by normalizeUsage.
+  const store = s.readStore();
+  const entry = store.files[path.join("proj", "a.jsonl")];
+  entry.records[0].usage = {
+    input_tokens: 0,
+    cache_creation_input_tokens: 5,
+    cache_creation: {},
+  };
+  fs.writeFileSync(s.storeFile(), JSON.stringify(store));
+
+  const [event] = await s.read();
+  assert.equal(event.usage.cacheWrite, 5);
+  assert.equal(event.usage.hasCacheBreakdown, false);
+});

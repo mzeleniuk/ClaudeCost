@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { loadSettings } from "../src/settings.js";
+import { DEFAULT_STORE_DIR } from "../src/store.js";
 
 function writeSettings(body) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-settings-"));
@@ -23,12 +24,37 @@ test("loadSettings defaults to the global region when the file is missing", () =
     os.tmpdir(),
     `claude-cost-missing-settings-${process.pid}.json`,
   );
-  assert.deepEqual(loadSettings(missing), { region: "global" });
+  assert.deepEqual(loadSettings(missing), {
+    region: "global",
+    storeDir: DEFAULT_STORE_DIR,
+  });
 });
 
 test("loadSettings reads region and ignores _ comments", () => {
   const file = writeSettings({ _comment: "work account", region: "eu" });
-  assert.deepEqual(loadSettings(file), { region: "eu" });
+  assert.deepEqual(loadSettings(file), {
+    region: "eu",
+    storeDir: DEFAULT_STORE_DIR,
+  });
+});
+
+test("loadSettings resolves storeDir against the settings file", () => {
+  const file = writeSettings({ storeDir: "./usage" });
+  assert.equal(
+    loadSettings(file).storeDir,
+    path.join(path.dirname(file), "usage"),
+  );
+
+  const home = writeSettings({ storeDir: "~/claude-cost-data" });
+  assert.equal(
+    loadSettings(home).storeDir,
+    path.join(os.homedir(), "claude-cost-data"),
+  );
+
+  assert.throws(
+    () => loadSettings(writeSettings({ storeDir: " " })),
+    /invalid storeDir .*expected a non-empty string/,
+  );
 });
 
 test("loadSettings rejects unknown regions, unknown keys and bad JSON", () => {

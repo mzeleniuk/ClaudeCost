@@ -50,17 +50,19 @@ claude-cost --region us             # price at the US multi-region endpoint
 
 ## Flags
 
-| Flag         | Description                                                    |
-| ------------ | -------------------------------------------------------------- |
-| `--since`    | `7d`, `24h`, `90m`, `2w`, `today`, or a date (see below)       |
-| `--monthly`  | Since the start of the current month (local time)              |
-| `--by-month` | Per-month, per-model breakdown across all history              |
-| `--by-model` | Break totals down per model. Not with `--by-month`.            |
-| `--json`     | Output JSON instead of a table                                 |
-| `--dir`      | Override transcript directory. Ignores `profiles.config.json`. |
-| `--pricing`  | Path to a custom pricing JSON. Overrides per-profile pricing.  |
-| `--region`   | Vertex AI endpoint you call. Overrides every other setting.    |
-| `-h, --help` | Show help                                                      |
+| Flag              | Description                                                       |
+| ----------------- | ----------------------------------------------------------------- |
+| `--since`         | `7d`, `24h`, `90m`, `2w`, `today`, or a date (see below)          |
+| `--monthly`       | Since the start of the current month (local time)                 |
+| `--by-month`      | Per-month, per-model breakdown across all history                 |
+| `--by-model`      | Break totals down per model. Not with `--by-month`.               |
+| `--json`          | Output JSON instead of a table                                    |
+| `--dir`           | Override transcript directory. Ignores `profiles.config.json`.    |
+| `--pricing`       | Path to a custom pricing JSON. Overrides per-profile pricing.     |
+| `--region`        | Vertex AI endpoint you call. Overrides every other setting.       |
+| `--no-cache`      | Read transcripts from disk only. See [Usage store](#usage-store). |
+| `--rebuild-cache` | Read every transcript again and rewrite the usage store.          |
+| `-h, --help`      | Show help                                                         |
 
 `--monthly` filters to the current month only. `--by-month` shows every month in your transcripts, each with a per-model breakdown, so it can't be combined with `--by-model`.
 
@@ -116,6 +118,30 @@ Some models charge more for long prompts. Add a `longContext` object with a `thr
   }
 }
 ```
+
+## Usage store
+
+Each run saves the usage it reads in `data/`, next to the program, with one file per transcript directory. `~/.claude/projects` is stored in `data/claude-projects-<hash>.json`. The next run reads only what changed: a transcript with the same size and modification time is skipped, and one that grew is read from where the last run stopped. On 285 MB of transcripts, a run went from 0.66 s to 0.21 s.
+
+Claude Code deletes CLI transcripts after [`cleanupPeriodDays`](https://code.claude.com/docs/en/data-usage#data-retention), 30 days by default. Sessions started or last continued in Claude Desktop are exempt. When a transcript is deleted, its usage stays in the store and keeps counting in every report. The table then adds a line like "Includes 12 deleted transcript(s) kept in the usage store", and `--json` reports the same count as `archivedTranscripts`.
+
+That makes `data/` the only copy of that history, so treat it like data:
+
+- Back it up. `git clean -fdx` deletes it, because it is in `.gitignore`. Plain `git clean -fd` leaves it alone.
+- `--rebuild-cache` reads every transcript on disk again but keeps the usage of deleted ones. Use it when you suspect the store is wrong.
+- `--no-cache` ignores the store and does not write it. Totals then cover only the transcripts still on disk.
+- Deleting a file in `data/` is the only way to drop stored history.
+- A store that cannot be parsed is renamed to `*.corrupt-<time>` and rebuilt from the transcripts on disk. Nothing is deleted.
+
+The store saves the raw `usage` object of each message, not computed costs. Pricing, region and parser fixes apply to stored history the same as to live transcripts.
+
+To keep the store somewhere else, set `storeDir` in `settings.config.json`. A relative path is resolved against that file's folder:
+
+```json
+{ "storeDir": "~/.local/share/claude-cost" }
+```
+
+To keep CLI transcripts longer in the first place, raise `cleanupPeriodDays` in `~/.claude/settings.json`. The store only has what some run has read. A transcript created and deleted between two runs is lost.
 
 ## Use from any Claude session
 

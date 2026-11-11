@@ -10,6 +10,7 @@ import { formatJson, roundCost } from "./format.js";
  * @param {MonthlyResult} result
  */
 export function buildMonthlyProfile({
+  archivedTranscripts,
   months,
   notInRegion,
   skippedUndated,
@@ -29,6 +30,7 @@ export function buildMonthlyProfile({
   }
 
   return {
+    archivedTranscripts,
     byMonth,
     notInRegion,
     skippedUndated,
@@ -47,6 +49,7 @@ export function renderMonthlyJson(result, { since, region }) {
   const profile = buildMonthlyProfile(result);
 
   return formatJson({
+    archivedTranscripts: profile.archivedTranscripts,
     byMonth: profile.byMonth,
     generatedAt: new Date().toISOString(),
     groupedBy: "month-model",

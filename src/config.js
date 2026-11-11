@@ -15,6 +15,19 @@ export function expandHome(p) {
 }
 
 /**
+ * Expand `~` and resolve a relative path against the config file's directory.
+ *
+ * @param {string} value
+ * @param {string} configFilePath
+ */
+export function resolveUserPath(value, configFilePath) {
+  const expanded = expandHome(value);
+
+  if (path.isAbsolute(expanded)) return expanded;
+  return path.resolve(path.dirname(configFilePath), expanded);
+}
+
+/**
  * Candidate directories where Claude Code stores session transcripts.
  * Claude Code reads only CLAUDE_CONFIG_DIR when it is set, so we do too.
  * Otherwise: modern path first, then legacy.

@@ -25,6 +25,34 @@
  * @property {string | null} messageId
  * @property {string | null} requestId
  * @property {string} file
+ * @property {boolean} [archived] True when `file` is gone and the event came
+ *   from the usage store.
+ */
+
+/**
+ * The fields pricing reads from one transcript line, kept as written. The
+ * usage store saves these, so a parser fix also applies to stored history.
+ *
+ * @typedef {object} UsageRecord
+ * @property {any} ts
+ * @property {any} id
+ * @property {any} requestId
+ * @property {any} model
+ * @property {Record<string, any>} usage
+ */
+
+/**
+ * What the usage store keeps for one transcript. `offset` is the byte offset
+ * just past the last complete line read, and `check` is a hash of the bytes
+ * before it, used to confirm the file was appended to and not rewritten.
+ *
+ * @typedef {object} StoreEntry
+ * @property {number} size
+ * @property {number} mtimeMs
+ * @property {number} offset
+ * @property {string} check
+ * @property {UsageRecord[]} records
+ * @property {string} [deletedAt] When the transcript was first missing.
  */
 
 /**
@@ -67,6 +95,8 @@
  * @property {Totals} total
  * @property {string[]} unknownModels
  * @property {string[]} notInRegion
+ * @property {number} archivedTranscripts Deleted transcripts from the usage
+ *   store that added at least one message to `total`.
  */
 
 /**

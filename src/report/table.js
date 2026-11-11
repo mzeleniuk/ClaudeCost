@@ -74,6 +74,20 @@ export function warningLines(
   return lines;
 }
 
+/**
+ * A note when usage from deleted transcripts is in the totals.
+ *
+ * @param {Pick<PricingSummary, "archivedTranscripts">} result
+ * @returns {string[]}
+ */
+export function archiveLines({ archivedTranscripts }) {
+  if (!archivedTranscripts) return [];
+
+  return [
+    `${INDENT}${dim(`Includes ${archivedTranscripts} deleted transcript(s) kept in the usage store.`)}`,
+  ];
+}
+
 export const EMPTY_LINE = `${INDENT}${dim("No activity in this period.")}`;
 
 /** @param {string} text */
@@ -101,6 +115,7 @@ export function renderTable(
     scopeLine(since, region),
     "",
     ...(total.messages ? grid.map((line) => INDENT + line) : [EMPTY_LINE]),
+    ...archiveLines(result),
     ...warningLines(result, { region, pricingFile }),
   ];
 

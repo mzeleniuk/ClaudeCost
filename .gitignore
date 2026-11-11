@@ -2,6 +2,7 @@
 .env
 *.log
 coverage/
+data/
 node_modules/
 profiles.config.json
 settings.config.json

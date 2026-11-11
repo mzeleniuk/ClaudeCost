@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { expandHome } from "./config.js";
+import { resolveUserPath } from "./config.js";
 import { validateRegion } from "./regions.js";
 import { isPlainObject, readJsonObject } from "./validate.js";
 
@@ -55,19 +55,6 @@ function checkOverlap(profile, earlier) {
       );
     }
   }
-}
-
-/**
- * Expand `~` and resolve a relative path against the config file's directory.
- *
- * @param {string} value
- * @param {string} configFilePath
- */
-function resolveUserPath(value, configFilePath) {
-  const expanded = expandHome(value);
-
-  if (path.isAbsolute(expanded)) return expanded;
-  return path.resolve(path.dirname(configFilePath), expanded);
 }
 
 /**

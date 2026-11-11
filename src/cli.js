@@ -9,6 +9,7 @@ import { loadProfiles } from "./profiles.js";
 import { REGIONS, validateRegion } from "./regions.js";
 import { loadSettings } from "./settings.js";
 import { parseSince, startOfMonth } from "./since.js";
+import { readStoredEvents } from "./store.js";
 import { resolveTranscriptDirs } from "./config.js";
 import { renderJson } from "./report/json.js";
 import { renderMonthlyJson } from "./report/monthlyJson.js";
@@ -44,11 +45,23 @@ OPTIONS
                       cost 10% more. Overrides the region in
                       settings.config.json and in profiles.
                       ${REGIONS.join(", ")}
+  --no-cache          Read every transcript from disk and leave the usage
+                      store alone. Totals miss deleted transcripts.
+  --rebuild-cache     Read every transcript on disk again and rewrite the
+                      usage store. Keeps usage from deleted transcripts.
   -h, --help          Show this help.
 
 SETTINGS
   settings.config.json next to this program sets defaults. Copy
   settings.config.example.json to get started. "region" defaults to global.
+  "storeDir" defaults to the data folder next to this program.
+
+USAGE STORE
+  Usage read from transcripts is saved in the store, one file per
+  transcript directory, so later runs read only new transcript data. Claude
+  Code deletes transcripts after cleanupPeriodDays, 30 days by default. Their
+  usage stays in the store and in the totals, so back the store up. It may
+  be the only copy of that history.
 
 PROFILES
   If profiles.config.json exists next to this program, each listed Claude
@@ -69,18 +82,37 @@ EXAMPLES
 `;
 
 /**
+ * How a run uses the usage store. `storeDir` is null with --no-cache.
+ *
+ * @typedef {{ storeDir: string | null, rebuild: boolean }} StoreMode
+ */
+
+/**
  * Scan transcripts in `dirs`, drop duplicate snapshots and aggregate them.
  *
  * @param {string[]} dirs
- * @param {{ pricing: PricingTable, since: Date | null, byModel: boolean, byMonth: boolean }} opts
+ * @param {{ pricing: PricingTable, since: Date | null, byModel: boolean, byMonth: boolean, store: StoreMode }} opts
  * @returns {Promise<AggregateResult | MonthlyResult>}
  */
-async function collectReport(dirs, { pricing, since, byModel, byMonth }) {
+async function collectReport(
+  dirs,
+  { pricing, since, byModel, byMonth, store },
+) {
   async function* allEvents() {
     /** @type {Set<string>} */
     const visited = new Set();
 
     for (const dir of dirs) {
+      if (store.storeDir) {
+        yield* await readStoredEvents(dir, {
+          storeDir: store.storeDir,
+          rebuild: store.rebuild,
+          visited,
+        });
+
+        continue;
+      }
+
       for await (const file of findTranscripts(dir, visited)) {
         yield* readUsageEvents(file);
       }
@@ -135,7 +167,9 @@ export async function run(argv) {
       help: { type: "boolean", short: "h", default: false },
       json: { type: "boolean", default: false },
       monthly: { type: "boolean", default: false },
+      "no-cache": { type: "boolean", default: false },
       pricing: { type: "string" },
+      "rebuild-cache": { type: "boolean", default: false },
       region: { type: "string" },
       since: { type: "string" },
     },
@@ -161,6 +195,10 @@ export async function run(argv) {
     );
   }
 
+  if (values["no-cache"] && values["rebuild-cache"]) {
+    throw new Error("use either --no-cache or --rebuild-cache, not both.");
+  }
+
   const byModel = values["by-model"];
   const byMonth = values["by-month"];
   const since = values.monthly ? startOfMonth() : parseSince(values.since);
@@ -168,6 +206,11 @@ export async function run(argv) {
     values.region != null ? validateRegion(values.region, "--region") : null;
   const settings = loadSettings();
   const profiles = values.dir ? null : loadProfiles();
+  /** @type {StoreMode} */
+  const store = {
+    storeDir: values["no-cache"] ? null : settings.storeDir,
+    rebuild: values["rebuild-cache"],
+  };
 
   if (profiles) {
     const reports = [];
@@ -177,10 +220,11 @@ export async function run(argv) {
       const pricing = loadPricing(pricingPath, region);
 
       const result = await collectReport([profile.projectsDir], {
-        pricing,
-        since,
         byModel,
         byMonth,
+        pricing,
+        since,
+        store,
       });
 
       reports.push({
@@ -207,10 +251,11 @@ export async function run(argv) {
   const dirs = resolveTranscriptDirs(values.dir);
   const pricing = loadPricing(values.pricing, region);
   const result = await collectReport(dirs, {
-    pricing,
-    since,
     byModel,
     byMonth,
+    pricing,
+    since,
+    store,
   });
 
   print(

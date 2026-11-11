@@ -48,8 +48,9 @@ function getOrInit(map, key, init) {
  * @returns {Promise<PricingSummary>}
  */
 async function sumEvents(events, { pricing, since }, bucketsFor) {
-  const total = emptyTotals();
+  const archived = new Set();
   const notInRegion = new Set();
+  const total = emptyTotals();
   const unknownModels = new Set();
 
   for await (const event of events) {
@@ -60,8 +61,9 @@ async function sumEvents(events, { pricing, since }, bucketsFor) {
 
     const price = priceForModel(pricing, event.model);
 
-    if (price._unknown) unknownModels.add(event.model);
+    if (event.archived) archived.add(event.file);
     if (price._notInRegion) notInRegion.add(event.model);
+    if (price._unknown) unknownModels.add(event.model);
 
     const cost = computeCost(price, event.usage);
 
@@ -70,6 +72,7 @@ async function sumEvents(events, { pricing, since }, bucketsFor) {
   }
 
   return {
+    archivedTranscripts: archived.size,
     notInRegion: [...notInRegion],
     total,
     unknownModels: [...unknownModels].filter((m) => m && m !== "unknown"),
