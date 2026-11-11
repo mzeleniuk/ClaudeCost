@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { usageTokenTotal } from "./dedupe.js";
 import {
   eventsFromRecord,
   findTranscripts,
@@ -75,6 +76,129 @@ async function checkAt(file, offset) {
   }
 
   return crypto.createHash("sha256").update(buf).digest("hex").slice(0, 16);
+}
+
+/**
+ * `value` without zero, empty-string, null, empty-array or empty-object
+ * fields. The parser reads a missing count as 0, so pricing is the same.
+ * Array items stay in place, because advisor messageIds use their index.
+ *
+ * @param {any} value
+ * @returns {any}
+ */
+function pruneEmpty(value) {
+  if (Array.isArray(value)) return value.map(pruneEmpty);
+  if (!isPlainObject(value)) return value;
+
+  /** @type {Record<string, any>} */
+  const out = {};
+
+  for (const [key, field] of Object.entries(value)) {
+    const pruned = pruneEmpty(field);
+    const empty =
+      pruned === 0 ||
+      pruned === "" ||
+      pruned === null ||
+      (Array.isArray(pruned) && pruned.length === 0) ||
+      (isPlainObject(pruned) && Object.keys(pruned).length === 0);
+
+    if (!empty) out[key] = pruned;
+  }
+
+  return out;
+}
+
+/**
+ * Token total of each event a record yields, keyed the way dedupeEvents
+ * keys them.
+ *
+ * @param {UsageRecord} record
+ */
+function eventTotals(record) {
+  /** @type {Map<string, number>} */
+  const totals = new Map();
+
+  for (const event of eventsFromRecord(record, "")) {
+    totals.set(String(event.messageId), usageTokenTotal(event.usage));
+  }
+
+  return totals;
+}
+
+/**
+ * Compare two copies of a message the way dedupeEvents would. "keep" when
+ * dedupeEvents keeps `kept`'s event for every key, "replace" when it keeps
+ * `next`'s for every key, and "both" when each copy wins somewhere.
+ *
+ * @param {Map<string, number>} kept
+ * @param {Map<string, number>} next
+ * @returns {"keep" | "replace" | "both"}
+ */
+function compareCopies(kept, next) {
+  let keptWins = true;
+  let nextWins = true;
+
+  for (const key of new Set([...kept.keys(), ...next.keys()])) {
+    const a = kept.get(key) ?? 0;
+    const b = next.get(key) ?? 0;
+
+    // On a tie dedupeEvents keeps the first one.
+    if (b > a) keptWins = false;
+    else nextWins = false;
+  }
+
+  if (keptWins) return "keep";
+  return nextWins ? "replace" : "both";
+}
+
+/**
+ * Records as saved in the store: usage without empty fields, and one record
+ * per message. Claude Code writes a line for each content block of a reply,
+ * so most messages appear two or more times in a row. A copy is dropped only
+ * when dedupeEvents would drop all of its events anyway, so totals and
+ * timestamps match a read without the store.
+ *
+ * @param {UsageRecord[]} records
+ * @returns {UsageRecord[]}
+ */
+export function compactRecords(records) {
+  /** @type {UsageRecord[]} */
+  const out = [];
+  /** @type {Map<string, { index: number, totals: Map<string, number> }>} */
+  const byKey = new Map();
+
+  for (const raw of records) {
+    const record = { ...raw, usage: pruneEmpty(raw.usage) };
+
+    if (!record.id) {
+      out.push(record);
+      continue;
+    }
+
+    const key = `${record.id}\0${record.requestId ?? ""}`;
+    const kept = byKey.get(key);
+    const totals = eventTotals(record);
+
+    if (!kept) {
+      byKey.set(key, { index: out.length, totals });
+      out.push(record);
+      continue;
+    }
+
+    const choice = compareCopies(kept.totals, totals);
+
+    if (choice === "replace") {
+      out[kept.index] = record;
+      kept.totals = totals;
+    } else if (choice === "both") {
+      // Later copies compare against this one. Replacing it in place keeps
+      // every copy that stays in the order dedupeEvents saw them.
+      byKey.set(key, { index: out.length, totals });
+      out.push(record);
+    }
+  }
+
+  return out;
 }
 
 /** @param {unknown} entry */
@@ -216,11 +340,11 @@ async function refreshEntry(file, stats, entry) {
 
       return {
         entry: {
-          size: stats.size,
+          check: await checkAt(file, scan.end),
           mtimeMs: stats.mtimeMs,
           offset: scan.end,
-          check: await checkAt(file, scan.end),
-          records: [...entry.records, ...scan.records],
+          records: compactRecords([...entry.records, ...scan.records]),
+          size: stats.size,
         },
         tail: scan.tail,
         updated: true,
@@ -232,11 +356,11 @@ async function refreshEntry(file, stats, entry) {
 
   return {
     entry: {
-      size: stats.size,
+      check: await checkAt(file, scan.end),
       mtimeMs: stats.mtimeMs,
       offset: scan.end,
-      check: await checkAt(file, scan.end),
-      records: scan.records,
+      records: compactRecords(scan.records),
+      size: stats.size,
     },
     tail: scan.tail,
     updated: true,

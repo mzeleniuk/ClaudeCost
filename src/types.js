@@ -32,6 +32,8 @@
 /**
  * The fields pricing reads from one transcript line, kept as written. The
  * usage store saves these, so a parser fix also applies to stored history.
+ * It drops zero and empty fields from `usage` and keeps one record per
+ * message, see compactRecords in store.js.
  *
  * @typedef {object} UsageRecord
  * @property {any} ts

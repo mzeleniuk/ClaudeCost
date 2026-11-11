@@ -6,8 +6,10 @@ import path from "node:path";
 
 import { aggregate } from "../src/aggregate.js";
 import { dedupeEvents } from "../src/dedupe.js";
+import { eventsFromRecord } from "../src/parse.js";
 import {
   STORE_VERSION,
+  compactRecords,
   readStoredEvents,
   storeFileName,
 } from "../src/store.js";
@@ -262,4 +264,123 @@ test("a stored record is priced again by the current parser", async (t) => {
   const [event] = await s.read();
   assert.equal(event.usage.cacheWrite, 5);
   assert.equal(event.usage.hasCacheBreakdown, false);
+});
+
+/**
+ * A usage record as parseUsageRecord returns it.
+ *
+ * @param {string | null} id
+ * @param {string} ts
+ * @param {Record<string, any>} usage
+ */
+const record = (id, ts, usage) => ({
+  id,
+  model: "claude-opus-5-5",
+  requestId: id && `req-${id}`,
+  ts,
+  usage,
+});
+
+/** @param {ReturnType<typeof record>[]} records */
+const priced = async (records) =>
+  (await dedupeEvents(records.flatMap((r) => eventsFromRecord(r, "f")))).map(
+    (event) => [event.messageId, event.ts?.toISOString(), event.usage],
+  );
+
+test("compactRecords drops empty usage fields but keeps iteration indexes", () => {
+  const [compact] = compactRecords([
+    record("m1", "2026-10-01T12:00:00.000Z", {
+      input_tokens: 3,
+      output_tokens: 0,
+      cache_creation: { ephemeral_5m_input_tokens: 0 },
+      inference_geo: "",
+      fallback_credit: null,
+      service_tier: "standard",
+      iterations: [{ type: "message", input_tokens: 0 }, { type: "x" }],
+      server_tool_use: { web_search_requests: 0, web_fetch_requests: 2 },
+    }),
+  ]);
+
+  assert.deepEqual(compact.usage, {
+    input_tokens: 3,
+    service_tier: "standard",
+    iterations: [{ type: "message" }, { type: "x" }],
+    server_tool_use: { web_fetch_requests: 2 },
+  });
+});
+
+test("compactRecords keeps one copy of a streamed message", async () => {
+  const records = [
+    record("m1", "2026-10-01T12:00:01.000Z", { input_tokens: 5 }),
+    record("m1", "2026-10-01T12:00:02.000Z", { input_tokens: 5 }),
+    record("m2", "2026-10-01T12:00:03.000Z", { output_tokens: 1 }),
+    record("m2", "2026-10-01T12:00:04.000Z", { output_tokens: 9 }),
+    record(null, "2026-10-01T12:00:05.000Z", { input_tokens: 1 }),
+    record(null, "2026-10-01T12:00:05.000Z", { input_tokens: 1 }),
+  ];
+  const compact = compactRecords(records);
+
+  // A tie keeps the first copy, a bigger later copy replaces it, and
+  // records without an id are never merged.
+  assert.deepEqual(
+    compact.map((r) => [r.id, r.ts]),
+    [
+      ["m1", "2026-10-01T12:00:01.000Z"],
+      ["m2", "2026-10-01T12:00:04.000Z"],
+      [null, "2026-10-01T12:00:05.000Z"],
+      [null, "2026-10-01T12:00:05.000Z"],
+    ],
+  );
+  assert.deepEqual(await priced(compact), await priced(records));
+});
+
+test("compactRecords keeps both copies when each wins one event", async () => {
+  const advisor = (tokens) => ({
+    type: "advisor_message",
+    model: "claude-haiku-5-5",
+    input_tokens: tokens,
+  });
+  const records = [
+    record("m1", "2026-10-01T12:00:01.000Z", {
+      input_tokens: 9,
+      iterations: [advisor(1)],
+    }),
+    record("m1", "2026-10-01T12:00:02.000Z", {
+      input_tokens: 2,
+      iterations: [advisor(7)],
+    }),
+    // Loses to the copy above on both events.
+    record("m1", "2026-10-01T12:00:03.000Z", {
+      input_tokens: 2,
+      iterations: [advisor(7)],
+    }),
+  ];
+  const compact = compactRecords(records);
+
+  assert.equal(compact.length, 2);
+  assert.deepEqual(await priced(compact), await priced(records));
+});
+
+test("collapses copies of a message split across two runs", async (t) => {
+  const s = setup();
+  t.after(() => fs.rmSync(s.root, { recursive: true, force: true }));
+  const file = s.transcript("a.jsonl");
+
+  fs.writeFileSync(file, `${line("m1", 10)}\n${line("m1", 10)}\n`);
+  await s.read();
+  fs.appendFileSync(file, `${line("m1", 30)}\n${line("m2", 20)}\n`);
+
+  assert.deepEqual(summary(await dedupeEvents(await s.read())), [
+    ["m1", 30],
+    ["m2", 20],
+  ]);
+
+  const entry = s.readStore().files[path.join("proj", "a.jsonl")];
+  assert.deepEqual(
+    entry.records.map((r) => [r.id, r.usage.input_tokens]),
+    [
+      ["m1", 30],
+      ["m2", 20],
+    ],
+  );
 });

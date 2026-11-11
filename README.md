@@ -133,7 +133,7 @@ That makes `data/` the only copy of that history, so treat it like data:
 - Deleting a file in `data/` is the only way to drop stored history.
 - A store that cannot be parsed is renamed to `*.corrupt-<time>` and rebuilt from the transcripts on disk. Nothing is deleted.
 
-The store saves the raw `usage` object of each message, not computed costs. Pricing, region and parser fixes apply to stored history the same as to live transcripts.
+The store saves the raw `usage` object of each message, not computed costs. Pricing, region and parser fixes apply to stored history the same as to live transcripts. To keep it small, the store leaves out fields that are zero or empty and saves one record per message, where a transcript often repeats a message once per content block.
 
 To keep the store somewhere else, set `storeDir` in `settings.config.json`. A relative path is resolved against that file's folder:
 
