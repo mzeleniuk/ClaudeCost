@@ -36,9 +36,7 @@
   --tok-write: #7d6e61;
   --tok-read: #524840;
 
-  --font:
-    ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable",
-    "Segoe UI", system-ui, sans-serif;
+  --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   --header-h: 60px;
   --side-w: 248px;
 }

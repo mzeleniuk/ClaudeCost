@@ -8,10 +8,7 @@ async function* mockEvents(list) {
 }
 
 test("usageTokenTotal sums normalized fields", () => {
-  assert.equal(
-    usageTokenTotal({ input: 1, output: 2, cacheWrite: 3, cacheRead: 4 }),
-    10,
-  );
+  assert.equal(usageTokenTotal({ input: 1, output: 2, cacheWrite: 3, cacheRead: 4 }), 10);
 });
 
 test("dedupe keeps higher-token snapshot for same messageId+requestId", async () => {

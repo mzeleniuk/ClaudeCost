@@ -132,8 +132,5 @@ export function parseSince(input, now = new Date()) {
   const date = absolute?.groups && dateFromParts(absolute.groups);
 
   if (date) return date;
-
-  throw new Error(
-    `invalid --since value: "${input}". Use e.g. 7d, 24h, today, 2025-01-15, or 2025-01-15T10:00.`,
-  );
+  throw new Error(`invalid --since value: "${input}". Use e.g. 7d, 24h, today, 2025-01-15, or 2025-01-15T10:00.`);
 }

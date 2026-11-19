@@ -168,7 +168,5 @@ test("sums normalized cacheWrite tokens from breakdown", async () => {
 
   const { total } = await aggregate(events, { pricing: PRICING });
   assert.equal(total.cacheWriteTokens, 100);
-  assert.ok(
-    Math.abs(total.costUSD - (20 * 3.75 + 80 * 6.0) / 1_000_000) < 1e-12,
-  );
+  assert.ok(Math.abs(total.costUSD - (20 * 3.75 + 80 * 6.0) / 1_000_000) < 1e-12);
 });

@@ -48,10 +48,7 @@ function setup() {
   };
 
   /** What `claude-cost --dashboard` builds for this directory. */
-  const build = async (
-    store = { storeDir, rebuild: false },
-    pricing = PRICING,
-  ) =>
+  const build = async (store = { storeDir, rebuild: false }, pricing = PRICING) =>
     collectDashboard(
       [
         {

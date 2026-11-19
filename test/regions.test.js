@@ -11,8 +11,7 @@ import {
   validateRegion,
 } from "../src/regions.js";
 
-const close = (actual, expected) =>
-  assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
+const close = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
 
 test("region lists only name models in pricing.config.json, and cover all of them", () => {
   const keys = Object.keys(loadPricing()).filter((k) => !k.startsWith("_"));
@@ -84,10 +83,7 @@ test("cost at a regional endpoint is 1.1x the global cost", () => {
   };
   const model = "claude-sonnet-4-5@20250929";
   const global = computeCost(priceForModel(loadPricing(), model), usage);
-  const regional = computeCost(
-    priceForModel(loadPricing(undefined, "europe-west1"), model),
-    usage,
-  );
+  const regional = computeCost(priceForModel(loadPricing(undefined, "europe-west1"), model), usage);
 
   close(regional, global * 1.1);
 });
@@ -97,9 +93,6 @@ test("models an endpoint does not offer are priced and marked", () => {
 
   assert.equal(priceForModel(pricing, "claude-opus-5-5")._notInRegion, true);
   close(priceForModel(pricing, "claude-opus-5-5").input, 4.4);
-  assert.equal(
-    priceForModel(pricing, "claude-sonnet-4-5")._notInRegion,
-    undefined,
-  );
+  assert.equal(priceForModel(pricing, "claude-sonnet-4-5")._notInRegion, undefined);
   assert.equal(priceForModel(pricing, "claude-opus-4-9")._unknown, true);
 });

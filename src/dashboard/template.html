@@ -26,10 +26,9 @@
             theme = localStorage.getItem("claude-cost-theme");
           }
         } catch (e) {}
+
         if (theme !== "light" && theme !== "dark") {
-          theme = matchMedia("(prefers-color-scheme: light)").matches
-            ? "light"
-            : "dark";
+          theme = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
         }
 
         document.documentElement.dataset.theme = theme;
@@ -43,34 +42,18 @@
   <body>
     <header class="top">
       <a class="wordmark" href="#" aria-label="claude cost">
-        <span>
-          Claude<span class="mark-dot">·</span
-          ><span class="mark-cost">Cost</span>
-        </span>
+        <span>Claude<span class="mark-dot">·</span><span class="mark-cost">Cost</span></span>
       </a>
 
       <nav class="nav" aria-label="filters">
         <div class="tabs" id="range-tabs" role="group" aria-label="range"></div>
         <span class="tabs-sep" id="profile-sep" hidden></span>
 
-        <div
-          class="tabs"
-          id="profile-tabs"
-          role="group"
-          aria-label="profile"
-          hidden
-        ></div>
+        <div class="tabs" id="profile-tabs" role="group" aria-label="profile" hidden></div>
       </nav>
 
       <div class="actions">
-        <button
-          class="text-btn filters-btn"
-          id="filters-open"
-          type="button"
-          aria-controls="sidebar"
-        >
-          Filters
-        </button>
+        <button class="text-btn filters-btn" id="filters-open" type="button" aria-controls="sidebar">Filters</button>
 
         <button
           class="icon-btn"
@@ -173,23 +156,14 @@
       <aside class="side" id="sidebar" aria-label="filters">
         <div class="side-top">
           <span>Filters</span>
-          <button class="text-btn" id="filters-close" type="button">
-            Close
-          </button>
+          <button class="text-btn" id="filters-close" type="button">Close</button>
         </div>
 
         <div class="group">
           <div class="group-head">
             <span>Models</span>
             <span class="group-meta">
-              <button
-                class="text-btn reset"
-                id="reset-models"
-                type="button"
-                hidden
-              >
-                Reset
-              </button>
+              <button class="text-btn reset" id="reset-models" type="button" hidden>Reset</button>
               <span id="count-models"> </span>
             </span>
           </div>
@@ -200,14 +174,7 @@
           <div class="group-head">
             <span>Projects</span>
             <span class="group-meta">
-              <button
-                class="text-btn reset"
-                id="reset-projects"
-                type="button"
-                hidden
-              >
-                Reset
-              </button>
+              <button class="text-btn reset" id="reset-projects" type="button" hidden>Reset</button>
               <span id="count-projects"></span>
             </span>
           </div>

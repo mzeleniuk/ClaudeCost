@@ -6,20 +6,10 @@ import { isPlainObject, readJsonObject } from "./validate.js";
 
 /** @import { Price, PricingTable, Rates, Usage } from "./types.js" */
 
-const DEFAULT_PRICING_PATH = path.join(
-  import.meta.dirname,
-  "..",
-  "pricing.config.json",
-);
+const DEFAULT_PRICING_PATH = path.join(import.meta.dirname, "..", "pricing.config.json");
 
 /** @type {readonly (keyof Rates)[]} */
-const PRICE_FIELDS = [
-  "input",
-  "output",
-  "cacheWrite",
-  "cacheWrite1h",
-  "cacheRead",
-];
+const PRICE_FIELDS = ["input", "output", "cacheWrite", "cacheWrite1h", "cacheRead"];
 
 /**
  * @param {Record<string, unknown>} rates
@@ -31,9 +21,7 @@ function validateRates(rates, label, filePath) {
     const value = rates[field];
 
     if (typeof value !== "number" || !Number.isFinite(value)) {
-      throw new Error(
-        `invalid pricing entry for ${label} in ${filePath}: "${field}" must be a number`,
-      );
+      throw new Error(`invalid pricing entry for ${label} in ${filePath}: "${field}" must be a number`);
     }
   }
 }
@@ -54,9 +42,7 @@ function parsePricing(raw, filePath) {
     if (model.startsWith("_")) continue;
 
     if (!isPlainObject(rates)) {
-      throw new Error(
-        `invalid pricing entry for "${model}" in ${filePath}: expected object`,
-      );
+      throw new Error(`invalid pricing entry for "${model}" in ${filePath}: expected object`);
     }
 
     validateRates(rates, `"${model}"`, filePath);
@@ -66,19 +52,11 @@ function parsePricing(raw, filePath) {
       const label = `"${model}" longContext`;
 
       if (!isPlainObject(tier)) {
-        throw new Error(
-          `invalid pricing entry for ${label} in ${filePath}: expected object`,
-        );
+        throw new Error(`invalid pricing entry for ${label} in ${filePath}: expected object`);
       }
 
-      if (
-        typeof tier.threshold !== "number" ||
-        !Number.isInteger(tier.threshold) ||
-        tier.threshold <= 0
-      ) {
-        throw new Error(
-          `invalid pricing entry for ${label} in ${filePath}: "threshold" must be a positive integer`,
-        );
+      if (typeof tier.threshold !== "number" || !Number.isInteger(tier.threshold) || tier.threshold <= 0) {
+        throw new Error(`invalid pricing entry for ${label} in ${filePath}: "threshold" must be a positive integer`);
       }
 
       validateRates(tier, label, filePath);
@@ -248,14 +226,10 @@ export function promptTokens(usage = {}) {
  * @param {Partial<Usage>} usage
  */
 function chargeByKind(price, usage) {
-  const rates =
-    price.longContext && promptTokens(usage) > price.longContext.threshold
-      ? price.longContext
-      : price;
+  const rates = price.longContext && promptTokens(usage) > price.longContext.threshold ? price.longContext : price;
 
   const cacheWrite = usage.hasCacheBreakdown
-    ? (usage.cacheWrite5m ?? 0) * rates.cacheWrite +
-      (usage.cacheWrite1h ?? 0) * rates.cacheWrite1h
+    ? (usage.cacheWrite5m ?? 0) * rates.cacheWrite + (usage.cacheWrite1h ?? 0) * rates.cacheWrite1h
     : (usage.cacheWrite ?? 0) * rates.cacheWrite;
 
   return {
@@ -274,11 +248,7 @@ function chargeByKind(price, usage) {
  */
 export function computeCost(price, usage = {}) {
   const charge = chargeByKind(price, usage);
-
-  return (
-    (charge.input + charge.output + charge.cacheWrite + charge.cacheRead) /
-    PER_MILLION
-  );
+  return (charge.input + charge.output + charge.cacheWrite + charge.cacheRead) / PER_MILLION;
 }
 
 /**

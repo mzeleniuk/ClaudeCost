@@ -196,6 +196,16 @@ Claude asks once before it runs the skill. To skip that prompt, add `Skill(claud
 npm test        # run the built-in Node test runner
 ```
 
+### Git hooks
+
+The hooks are plain shell scripts in `.githooks`. Git does not use that folder by default, so run this once per clone:
+
+```bash
+npm run hooks:install   # git config core.hooksPath .githooks
+```
+
+`pre-commit` checks formatting of the staged files with Prettier and runs `npm run lint`. `pre-push` runs `npm run format:check`, `npm run lint`, `npm run typecheck` and `npm test`. To skip a hook once, pass `--no-verify` to `git commit` or `git push`.
+
 ## License
 
 MIT

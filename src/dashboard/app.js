@@ -12,9 +12,7 @@ function byId(id) {
   return el;
 }
 
-const data = /** @type {DashboardData} */ (
-  JSON.parse(byId("claude-cost-data").textContent ?? "{}")
-);
+const data = /** @type {DashboardData} */ (JSON.parse(byId("claude-cost-data").textContent ?? "{}"));
 
 const F = data.facts;
 const NROWS = F.day.length;
@@ -28,20 +26,7 @@ const NPROFILES = data.profiles.length;
 // through `new Date("YYYY-MM-DD")`, which would read them as UTC.
 // =============================================================================
 
-const MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const MONTHS_LONG = [
   "January",
@@ -60,15 +45,7 @@ const MONTHS_LONG = [
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-const WEEKDAYS_PLURAL = [
-  "Mondays",
-  "Tuesdays",
-  "Wednesdays",
-  "Thursdays",
-  "Fridays",
-  "Saturdays",
-  "Sundays",
-];
+const WEEKDAYS_PLURAL = ["Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays", "Sundays"];
 
 /** @param {number} n */
 const pad = (n) => String(n).padStart(2, "0");
@@ -127,9 +104,7 @@ function fmtMDY(s) {
 function fmtSpan(a, b) {
   if (a === b) return fmtMDY(a);
 
-  return dayParts(a).y === dayParts(b).y
-    ? `${fmtMD(a)} to ${fmtMDY(b)}`
-    : `${fmtMDY(a)} to ${fmtMDY(b)}`;
+  return dayParts(a).y === dayParts(b).y ? `${fmtMD(a)} to ${fmtMDY(b)}` : `${fmtMDY(a)} to ${fmtMDY(b)}`;
 }
 
 /** Local date and time of an ISO instant in the data's time zone. @param {string} iso */
@@ -163,10 +138,7 @@ function localClock(iso) {
     date: `${get("year")}-${get("month")}-${get("day")}`,
     time: `${get("hour")}:${get("minute")}`,
     atMidnight:
-      get("hour") === "00" &&
-      get("minute") === "00" &&
-      get("second") === "00" &&
-      instant.getUTCMilliseconds() === 0,
+      get("hour") === "00" && get("minute") === "00" && get("second") === "00" && instant.getUTCMilliseconds() === 0,
   };
 }
 
@@ -175,11 +147,7 @@ const capturedFrom = data.since ? localClock(data.since) : null;
 
 /** Whether the capture includes a whole day from local midnight. @param {string} day */
 function coversDayStart(day) {
-  return (
-    !capturedFrom ||
-    capturedFrom.date < day ||
-    (capturedFrom.date === day && capturedFrom.atMidnight)
-  );
+  return !capturedFrom || capturedFrom.date < day || (capturedFrom.date === day && capturedFrom.atMidnight);
 }
 
 // Calendar structure per day index, computed once.
@@ -290,13 +258,8 @@ function compareVersionsDesc(a, b) {
   const order = data.models
     .map((id, i) => ({ i, ...parseModel(id) }))
     .sort((a, b) => {
-      const rank = (/** @type {string | null} */ f) =>
-        f ? FAMILIES.indexOf(f) : FAMILIES.length;
-      return (
-        rank(a.family) - rank(b.family) ||
-        compareVersionsDesc(a.version, b.version) ||
-        a.i - b.i
-      );
+      const rank = (/** @type {string | null} */ f) => (f ? FAMILIES.indexOf(f) : FAMILIES.length);
+      return rank(a.family) - rank(b.family) || compareVersionsDesc(a.version, b.version) || a.i - b.i;
     });
 
   const newIndex = new Array(order.length);
@@ -326,10 +289,7 @@ const modelInfo = data.models.map((id) => ({ ...parseModel(id), id }));
 const modelColors = modelInfo.map((info, i) => {
   if (!info.family) return "var(--fg-3)";
 
-  const rank = modelInfo
-    .slice(0, i)
-    .filter((m) => m.family === info.family).length;
-
+  const rank = modelInfo.slice(0, i).filter((m) => m.family === info.family).length;
   return `var(--${info.family}-${Math.min(rank, 2) + 1})`;
 });
 
@@ -399,11 +359,7 @@ function readHash() {
   state.profile = profile < NPROFILES ? profile : -1;
   // Edit the arrays in place, the sidebar rows hold on to them.
   state.modelOn.splice(0, NMODELS, ...readActive(params, "models", NMODELS));
-  state.projectOn.splice(
-    0,
-    NPROJECTS,
-    ...readActive(params, "projects", NPROJECTS),
-  );
+  state.projectOn.splice(0, NPROJECTS, ...readActive(params, "projects", NPROJECTS));
 }
 
 /** @param {boolean[]} on */
@@ -411,24 +367,17 @@ const activeList = (on) => on.flatMap((v, i) => (v ? [i] : [])).join(".");
 
 function writeHash() {
   const params = new URLSearchParams(location.hash.slice(1));
-  for (const key of ["range", "profile", "models", "projects"])
-    params.delete(key);
+  for (const key of ["range", "profile", "models", "projects"]) params.delete(key);
 
   if (state.range !== "all") params.set("range", state.range);
   if (state.profile >= 0) params.set("profile", String(state.profile));
-  if (state.modelOn.includes(false))
-    params.set("models", activeList(state.modelOn));
-  if (state.projectOn.includes(false))
-    params.set("projects", activeList(state.projectOn));
+  if (state.modelOn.includes(false)) params.set("models", activeList(state.modelOn));
+  if (state.projectOn.includes(false)) params.set("projects", activeList(state.projectOn));
 
   const hash = params.toString();
 
   try {
-    history.replaceState(
-      null,
-      "",
-      `${location.pathname}${location.search}${hash ? `#${hash}` : ""}`,
-    );
+    history.replaceState(null, "", `${location.pathname}${location.search}${hash ? `#${hash}` : ""}`);
   } catch {
     location.hash = hash;
   }
@@ -473,9 +422,7 @@ function previousBounds() {
 
   if (state.range === "month") {
     const { y, m } = dayParts(data.days[view.lo]);
-    const prevStart = dayIndex.get(
-      m === 1 ? `${y - 1}-12-01` : `${y}-${pad(m - 1)}-01`,
-    );
+    const prevStart = dayIndex.get(m === 1 ? `${y - 1}-12-01` : `${y}-${pad(m - 1)}-01`);
 
     if (prevStart === undefined) return null;
     lo = prevStart;
@@ -564,12 +511,7 @@ const byProject = (/** @type {number} */ i) => F.project[i];
 const messagesOf = (/** @type {number} */ i) => F.messages[i];
 
 // Cost by token kind, in the order input, output, cache write, cache read.
-const categoryCost = [
-  F.costInput,
-  F.costOutput,
-  F.costCacheWrite,
-  F.costCacheRead,
-];
+const categoryCost = [F.costInput, F.costOutput, F.costCacheWrite, F.costCacheRead];
 
 // =============================================================================
 // DOM and SVG helpers
@@ -735,10 +677,7 @@ function showPoint(c, x, y) {
   const hgt = tipEl.offsetHeight;
   const left = x + 14 + w > innerWidth - 8 ? x - 14 - w : x + 14;
 
-  moveTip(
-    Math.max(8, left),
-    clamp(y + 14, 8, Math.max(8, innerHeight - hgt - 8)),
-  );
+  moveTip(Math.max(8, left), clamp(y + 14, 8, Math.max(8, innerHeight - hgt - 8)));
 }
 
 function hideTip() {
@@ -777,10 +716,7 @@ function pinColumn(handle, i, y) {
 }
 
 document.addEventListener("click", (e) => {
-  if (
-    pinned &&
-    !(e.target instanceof Node && pinned.handle.host.contains(e.target))
-  ) {
+  if (pinned && !(e.target instanceof Node && pinned.handle.host.contains(e.target))) {
     resetTip();
   }
 });
@@ -794,12 +730,7 @@ document.addEventListener("keydown", (e) => {
 
     const { handle } = pinned;
 
-    pinned.index = clamp(
-      pinned.index + (e.key === "ArrowLeft" ? -1 : 1),
-      0,
-      handle.count - 1,
-    );
-
+    pinned.index = clamp(pinned.index + (e.key === "ArrowLeft" ? -1 : 1), 0, handle.count - 1);
     showColumn(handle, pinned.index);
   }
 });
@@ -855,22 +786,16 @@ function drawEmpty(host, height) {
   host.removeAttribute("aria-label");
 
   const unpriced = sumOf(matcher(), messagesOf) > 0;
-  const text = unpriced
-    ? "usage in this range is priced at $0."
-    : "no usage in this range.";
+  const text = unpriced ? "usage in this range is priced at $0." : "no usage in this range.";
 
-  fill(host, [
-    h("div", { class: "empty", text, attrs: { style: `height:${height}px` } }),
-  ]);
+  fill(host, [h("div", { class: "empty", text, attrs: { style: `height:${height}px` } })]);
 }
 
 /** @param {HTMLElement} host @param {{ color: string, label: string }[]} items */
 function renderLegend(host, items) {
   fill(
     host,
-    items.map((it) =>
-      h("span", {}, [dot(it.color), document.createTextNode(it.label)]),
-    ),
+    items.map((it) => h("span", {}, [dot(it.color), document.createTextNode(it.label)])),
   );
 
   host.hidden = items.length < 2;
@@ -889,10 +814,7 @@ function niceTicks(max, target = 4) {
   const raw = max / target;
   const mag = 10 ** Math.floor(Math.log10(raw));
   const norm = raw / mag;
-  const step = Math.max(
-    0.01,
-    (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag,
-  );
+  const step = Math.max(0.01, (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag);
   const n = Math.ceil(max / step - 1e-9);
 
   return { ticks: Array.from({ length: n + 1 }, (_, i) => r2(i * step)), step };
@@ -945,11 +867,7 @@ function columnChart(o) {
   const top = o.totals ? 24 : 10;
   const bottom = 24;
   const right = 6;
-  const yMax0 = Math.max(
-    0.01,
-    ...o.cols.map((c) => c.total),
-    ...(o.line ?? []),
-  );
+  const yMax0 = Math.max(0.01, ...o.cols.map((c) => c.total), ...(o.line ?? []));
   const { ticks, step } = niceTicks(yMax0);
   const yMax = ticks[ticks.length - 1];
   const labels = ticks.map((t) => axisUsd(t, step));
@@ -988,9 +906,7 @@ function columnChart(o) {
       }),
     );
 
-    root.append(
-      svg("text", { x: left - 8, y: y + 4, "text-anchor": "end" }, [labels[k]]),
-    );
+    root.append(svg("text", { x: left - 8, y: y + 4, "text-anchor": "end" }, [labels[k]]));
   });
 
   // Hover column sits behind the bars.
@@ -1052,12 +968,7 @@ function columnChart(o) {
 
   // Trailing average.
   if (o.line && n > 1) {
-    const d = o.line
-      .map(
-        (v, i) =>
-          `${i ? "L" : "M"}${r2(left + i * slot + slot / 2)},${r2(yOf(v))}`,
-      )
-      .join("");
+    const d = o.line.map((v, i) => `${i ? "L" : "M"}${r2(left + i * slot + slot / 2)},${r2(yOf(v))}`).join("");
     root.append(svg("path", { class: "avg-line", d }));
   }
 
@@ -1073,9 +984,7 @@ function columnChart(o) {
     const x0 = anchor === "start" ? x : x - tw / 2;
     if (x0 < lastEnd + 8 || x0 + tw > w) continue;
     lastEnd = x0 + tw;
-    root.append(
-      svg("text", { x: r2(x), y: o.height - 6, "text-anchor": anchor }, [text]),
-    );
+    root.append(svg("text", { x: r2(x), y: o.height - 6, "text-anchor": anchor }, [text]));
   }
 
   // One transparent target over the whole plot, so the pointer never misses a gap.
@@ -1114,20 +1023,11 @@ function columnChart(o) {
   };
 
   /** @param {PointerEvent | MouseEvent} e */
-  const indexAt = (e) =>
-    clamp(
-      Math.floor((e.clientX - root.getBoundingClientRect().left - left) / slot),
-      0,
-      n - 1,
-    );
+  const indexAt = (e) => clamp(Math.floor((e.clientX - root.getBoundingClientRect().left - left) / slot), 0, n - 1);
 
-  hit.addEventListener("pointermove", (e) =>
-    hoverColumn(handle, indexAt(e), e.clientY),
-  );
+  hit.addEventListener("pointermove", (e) => hoverColumn(handle, indexAt(e), e.clientY));
   hit.addEventListener("pointerleave", () => leaveColumn(handle));
-  hit.addEventListener("click", (e) =>
-    pinColumn(handle, indexAt(e), e.clientY),
-  );
+  hit.addEventListener("click", (e) => pinColumn(handle, indexAt(e), e.clientY));
 
   o.host.setAttribute("role", "img");
   o.host.setAttribute("aria-label", o.aria);
@@ -1143,10 +1043,9 @@ const profileTabs = byId("profile-tabs");
 
 /** @param {string} label @param {() => void} onClick */
 function tabButton(label, onClick) {
-  const b = /** @type {HTMLButtonElement} */ (
-    h("button", { class: "tab", text: label, attrs: { type: "button" } })
-  );
+  const b = /** @type {HTMLButtonElement} */ (h("button", { class: "tab", text: label, attrs: { type: "button" } }));
   b.addEventListener("click", onClick);
+
   return b;
 }
 
@@ -1189,13 +1088,8 @@ if (NPROFILES > 1) {
 }
 
 function syncTabs() {
-  RANGES.forEach((r, i) =>
-    rangeButtons[i].setAttribute("aria-pressed", String(r.id === state.range)),
-  );
-
-  profileButtons.forEach((b, i) =>
-    b.setAttribute("aria-pressed", String(i - 1 === state.profile)),
-  );
+  RANGES.forEach((r, i) => rangeButtons[i].setAttribute("aria-pressed", String(r.id === state.range)));
+  profileButtons.forEach((b, i) => b.setAttribute("aria-pressed", String(i - 1 === state.profile)));
 }
 
 const themeToggle = byId("theme-toggle");
@@ -1225,8 +1119,7 @@ function syncTheme() {
 }
 
 themeToggle.addEventListener("click", () => {
-  const next =
-    document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
   document.documentElement.dataset.theme = next;
 
   try {
@@ -1289,15 +1182,11 @@ function showOnly(on, i) {
 function buildRows(host, on, items) {
   const rows = items.map((item, i) => {
     const b = /** @type {HTMLButtonElement} */ (
-      h(
-        "button",
-        { class: "side-row", title: item.title, attrs: { type: "button" } },
-        [
-          item.color ? dot(item.color) : null,
-          h("span", { class: "name", text: item.label }),
-          h("span", { class: "amt" }),
-        ],
-      )
+      h("button", { class: "side-row", title: item.title, attrs: { type: "button" } }, [
+        item.color ? dot(item.color) : null,
+        h("span", { class: "name", text: item.label }),
+        h("span", { class: "amt" }),
+      ])
     );
 
     b.addEventListener("click", (e) =>
@@ -1334,9 +1223,7 @@ for (const [id, on] of /** @type {[string, boolean[]][]} */ ([
   ["models", state.modelOn],
   ["projects", state.projectOn],
 ])) {
-  byId(`reset-${id}`).addEventListener("click", () =>
-    change(() => on.fill(true)),
-  );
+  byId(`reset-${id}`).addEventListener("click", () => change(() => on.fill(true)));
 }
 
 /**
@@ -1361,8 +1248,7 @@ function updateRows(rows, on, costs, seen, countId, resetId) {
     }
   });
 
-  byId(countId).textContent =
-    active === shown ? String(shown) : `${active} of ${shown}`;
+  byId(countId).textContent = active === shown ? String(shown) : `${active} of ${shown}`;
   byId(resetId).hidden = active === shown;
 }
 
@@ -1421,14 +1307,9 @@ function renderKpis() {
   const cells = [];
 
   cells.push(
-    kpi(
-      "spent",
-      usd(total),
-      n > 0
-        ? fmtSpan(data.days[view.lo], data.days[view.hi])
-        : "no days with usage",
-      { big: true },
-    ),
+    kpi("spent", usd(total), n > 0 ? fmtSpan(data.days[view.lo], data.days[view.hi]) : "no days with usage", {
+      big: true,
+    }),
   );
 
   // Change against the equal-length period before.
@@ -1441,22 +1322,14 @@ function renderKpis() {
 
     if (before > 0) {
       const rounded = Math.round(((total - before) / before) * 100);
-      const text =
-        rounded === 0
-          ? "0%"
-          : `${rounded > 0 ? "+" : "-"}${count(Math.abs(rounded))}%`;
-      const label =
-        state.range === "month"
-          ? "vs previous month"
-          : `vs previous ${state.range}`;
+      const text = rounded === 0 ? "0%" : `${rounded > 0 ? "+" : "-"}${count(Math.abs(rounded))}%`;
+      const label = state.range === "month" ? "vs previous month" : `vs previous ${state.range}`;
 
       cells.push(
         kpi(
           label,
           [
-            rounded === 0
-              ? null
-              : h("span", { class: "arrow", text: rounded > 0 ? "▲" : "▼" }),
+            rounded === 0 ? null : h("span", { class: "arrow", text: rounded > 0 ? "▲" : "▼" }),
             document.createTextNode(text),
           ],
           usd(before),
@@ -1466,18 +1339,8 @@ function renderKpis() {
     }
   }
 
-  const active = perDay.reduce(
-    (c, v, d) => c + (d >= view.lo && d <= view.hi && v > 0 ? 1 : 0),
-    0,
-  );
-
-  cells.push(
-    kpi(
-      "per active day",
-      usd(active ? total / active : 0),
-      `${active} of ${Math.max(n, 0)} days active`,
-    ),
-  );
+  const active = perDay.reduce((c, v, d) => c + (d >= view.lo && d <= view.hi && v > 0 ? 1 : 0), 0);
+  cells.push(kpi("per active day", usd(active ? total / active : 0), `${active} of ${Math.max(n, 0)} days active`));
 
   // Project only when --since preserves the whole month to date; otherwise
   // show the peak day in the selected range.
@@ -1486,56 +1349,28 @@ function renderKpis() {
 
   if (n > 0 && dayMonthKey[view.hi] === month && coversDayStart(monthStart)) {
     const base = matcher({ range: false });
-    const toDate = sumOf(
-      (i) =>
-        base(i) &&
-        dayMonthKey[F.day[i]] === month &&
-        data.days[F.day[i]] <= generated.date,
-    );
+    const toDate = sumOf((i) => base(i) && dayMonthKey[F.day[i]] === month && data.days[F.day[i]] <= generated.date);
     const { y, m, d } = dayParts(generated.date);
 
-    cells.push(
-      kpi(
-        "month-end pace",
-        usd((toDate / d) * daysInMonth(y, m)),
-        `month to date ${usd(toDate)}`,
-      ),
-    );
+    cells.push(kpi("month-end pace", usd((toDate / d) * daysInMonth(y, m)), `month to date ${usd(toDate)}`));
   } else {
     let best = -1;
     perDay.forEach((v, d) => {
-      if (
-        d >= view.lo &&
-        d <= view.hi &&
-        v > 0 &&
-        (best < 0 || v > perDay[best])
-      )
-        best = d;
+      if (d >= view.lo && d <= view.hi && v > 0 && (best < 0 || v > perDay[best])) best = d;
     });
 
-    cells.push(
-      kpi(
-        "busiest day",
-        usd(best < 0 ? 0 : perDay[best]),
-        best < 0 ? "no spend" : fmtMD(data.days[best]),
-      ),
-    );
+    cells.push(kpi("busiest day", usd(best < 0 ? 0 : perDay[best]), best < 0 ? "no spend" : fmtMD(data.days[best])));
   }
 
   // Cache writes cost more than plain input, so caching can cost more than it
   // saves. Sums of rounded costs can miss by a fraction of a cent.
   const uncached = sumOf(pass, (i) => F.uncachedCost[i]);
   const saved = uncached - total;
-  const share =
-    uncached > 0 ? Math.round((Math.abs(saved) / uncached) * 100) : 0;
+  const share = uncached > 0 ? Math.round((Math.abs(saved) / uncached) * 100) : 0;
 
   cells.push(
     saved > -0.005
-      ? kpi(
-          "caching saved",
-          usd(Math.max(saved, 0)),
-          `${share}% off the uncached price`,
-        )
+      ? kpi("caching saved", usd(Math.max(saved, 0)), `${share}% off the uncached price`)
       : kpi("caching cost", usd(-saved), `${share}% over the uncached price`),
   );
 
@@ -1584,10 +1419,7 @@ function renderDaily() {
   const n = hi - lo + 1;
 
   const cols = Array.from({ length: Math.max(n, 0) }, (_, i) => {
-    const values = Array.from(
-      { length: NMODELS },
-      (_, m) => grid[(lo + i) * NMODELS + m],
-    );
+    const values = Array.from({ length: NMODELS }, (_, m) => grid[(lo + i) * NMODELS + m]);
 
     return { values, total: arraySum(values) };
   });
@@ -1608,8 +1440,7 @@ function renderDaily() {
     if (c.total > cols[best].total) best = i;
   });
 
-  byId("cap-daily").textContent =
-    `most expensive day ${fmtMD(data.days[lo + best])}, ${usd(cols[best].total)}`;
+  byId("cap-daily").textContent = `most expensive day ${fmtMD(data.days[lo + best])}, ${usd(cols[best].total)}`;
 
   const used = modelSegs.filter((_, m) => cols.some((c) => c.values[m] > 0));
   renderLegend(byId("legend-daily"), used);
@@ -1618,15 +1449,10 @@ function renderDaily() {
   const line = cols.map((_, i) => {
     const from = Math.max(0, lo + i - 6);
 
-    return (
-      arraySum(Array.from(totals.subarray(from, lo + i + 1))) /
-      (lo + i - from + 1)
-    );
+    return arraySum(Array.from(totals.subarray(from, lo + i + 1))) / (lo + i - from + 1);
   });
 
-  const monthStarts = Array.from({ length: n }, (_, i) => i).filter(
-    (i) => dayParts(data.days[lo + i]).d === 1,
-  );
+  const monthStarts = Array.from({ length: n }, (_, i) => i).filter((i) => dayParts(data.days[lo + i]).d === 1);
   const multiYear = dayParts(data.days[lo]).y !== dayParts(data.days[hi]).y;
 
   /** @type {(i: number, slot: number) => string | null} */
@@ -1634,20 +1460,9 @@ function renderDaily() {
     const s = data.days[lo + i];
     const { m, d, y } = dayParts(s);
 
-    if (n <= 10)
-      return d === 1
-        ? `${MONTHS[m - 1]} 1`
-        : `${WEEKDAYS[dayWeekday[lo + i]]} ${d}`;
-    if (n <= 35)
-      return d === 1
-        ? `${MONTHS[m - 1]} 1`
-        : slot >= 16 || d % 2 === 1
-          ? String(d)
-          : null;
-    const name =
-      multiYear && (m === 1 || i === 0)
-        ? `${MONTHS[m - 1]} ${y}`
-        : MONTHS[m - 1];
+    if (n <= 10) return d === 1 ? `${MONTHS[m - 1]} 1` : `${WEEKDAYS[dayWeekday[lo + i]]} ${d}`;
+    if (n <= 35) return d === 1 ? `${MONTHS[m - 1]} 1` : slot >= 16 || d % 2 === 1 ? String(d) : null;
+    const name = multiYear && (m === 1 || i === 0) ? `${MONTHS[m - 1]} ${y}` : MONTHS[m - 1];
 
     if (d === 1) return name;
     // Label the partial first month only when there is room before the next one.
@@ -1663,13 +1478,7 @@ function renderDaily() {
       line,
       xLabel,
       labelAnchor: n > 35 ? "start" : "middle",
-      tooltip: (i) =>
-        modelTip(
-          fmtWeekdayMD(data.days[lo + i]),
-          cols[i].values,
-          modelSegs,
-          messages[lo + i],
-        ),
+      tooltip: (i) => modelTip(fmtWeekdayMD(data.days[lo + i]), cols[i].values, modelSegs, messages[lo + i]),
       aria: `Stacked bar chart of daily spend from ${fmtMD(data.days[lo])} to ${fmtMD(data.days[hi])}. Total ${usd(spent)}. Peak ${usd(cols[best].total)} on ${fmtMD(data.days[lo + best])}.`,
     }),
   );
@@ -1683,31 +1492,15 @@ function renderMonthly() {
   const host = byId("chart-monthly");
   const pass = matcher({ range: false });
   const nMonths = monthKeys.length;
-  const grid = tabulate(
-    pass,
-    nMonths,
-    NMODELS,
-    (i) => dayMonth[F.day[i]],
-    byModel,
-  );
-  const messages = groupSum(
-    pass,
-    (i) => dayMonth[F.day[i]],
-    nMonths,
-    messagesOf,
-  );
+  const grid = tabulate(pass, nMonths, NMODELS, (i) => dayMonth[F.day[i]], byModel);
+  const messages = groupSum(pass, (i) => dayMonth[F.day[i]], nMonths, messagesOf);
 
   const cols = monthKeys.map((_, k) => {
-    const values = Array.from(
-      { length: NMODELS },
-      (_, m) => grid[k * NMODELS + m],
-    );
+    const values = Array.from({ length: NMODELS }, (_, m) => grid[k * NMODELS + m]);
     return { values, total: arraySum(values) };
   });
   const spent = arraySum(cols.map((c) => c.total));
-  byId("cap-monthly").textContent = capturedFrom
-    ? `since ${fmtMDY(capturedFrom.date)}`
-    : "all history";
+  byId("cap-monthly").textContent = capturedFrom ? `since ${fmtMDY(capturedFrom.date)}` : "all history";
 
   if (!(spent > 0)) {
     drawEmpty(host, 200);
@@ -1719,10 +1512,7 @@ function renderMonthly() {
   const monthName = (k) => {
     const [y, m] = monthKeys[k].split("-").map(Number);
     return {
-      short:
-        multiYear && (m === 1 || k === 0)
-          ? `${MONTHS[m - 1]} ${y}`
-          : MONTHS[m - 1],
+      short: multiYear && (m === 1 || k === 0) ? `${MONTHS[m - 1]} ${y}` : MONTHS[m - 1],
       long: `${MONTHS_LONG[m - 1]} ${y}`,
     };
   };
@@ -1735,8 +1525,7 @@ function renderMonthly() {
       cols,
       totals: true,
       xLabel: (k) => monthName(k).short,
-      tooltip: (k) =>
-        modelTip(monthName(k).long, cols[k].values, modelSegs, messages[k]),
+      tooltip: (k) => modelTip(monthName(k).long, cols[k].values, modelSegs, messages[k]),
       aria: `Stacked bar chart of spend per month, ${nMonths} months, ${usd(spent)} in total.`,
     }),
   );
@@ -1759,8 +1548,7 @@ const MIN_RANKED = 0.005;
  */
 function renderRanking(host, items, total, more) {
   const top = items.length ? items[0].value : 0;
-  const shownItems =
-    more && !more.expanded ? items.slice(0, more.limit) : items;
+  const shownItems = more && !more.expanded ? items.slice(0, more.limit) : items;
   const rows = shownItems.map((it) => {
     const bar = h("i");
     bar.style.width = `${top > 0 ? (it.value / top) * 100 : 0}%`;
@@ -1790,11 +1578,7 @@ function renderRanking(host, items, total, more) {
     rows.push(h("li", {}, [btn]));
   }
 
-  if (!rows.length)
-    rows.push(
-      h("li", { class: "rank-empty", text: "nothing to rank in this range." }),
-    );
-
+  if (!rows.length) rows.push(h("li", { class: "rank-empty", text: "nothing to rank in this range." }));
   fill(host, rows);
 }
 
@@ -1827,8 +1611,7 @@ function renderRankings() {
   for (let k = 0; k < S.project.length; k++) {
     if (state.profile >= 0 && S.profile[k] !== state.profile) continue;
     if (!state.projectOn[S.project[k]]) continue;
-    if (S.lastDay[k] >= view.lo && S.firstDay[k] <= view.hi)
-      sessions[S.project[k]]++;
+    if (S.lastDay[k] >= view.lo && S.firstDay[k] <= view.hi) sessions[S.project[k]]++;
   }
 
   const projects = data.projects
@@ -1852,9 +1635,7 @@ function renderRankings() {
   });
 
   const topN = Math.min(3, projects.length);
-  const topShare = Math.round(
-    (arraySum(projects.slice(0, topN).map((p) => p.value)) / total) * 100,
-  );
+  const topShare = Math.round((arraySum(projects.slice(0, topN).map((p) => p.value)) / total) * 100);
 
   byId("cap-projects").textContent = !projects.length
     ? ""
@@ -1880,26 +1661,17 @@ function heatLevels(values) {
     .filter((v) => v > 0)
     .sort((a, b) => a - b);
   const max = sorted[sorted.length - 1] ?? 0;
-  const cuts = [0.2, 0.4, 0.6, 0.8].map(
-    (q) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))],
-  );
+  const cuts = [0.2, 0.4, 0.6, 0.8].map((q) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))]);
 
-  return (/** @type {number} */ v) =>
-    v <= 0 ? 0 : v >= max ? 5 : 1 + cuts.filter((c) => v > c).length;
+  return (/** @type {number} */ v) => (v <= 0 ? 0 : v >= max ? 5 : 1 + cuts.filter((c) => v > c).length);
 }
 
 /** @param {number} level */
-const heatFill = (level) =>
-  level === 0 ? "var(--line)" : `var(--heat-${level})`;
+const heatFill = (level) => (level === 0 ? "var(--line)" : `var(--heat-${level})`);
 
 /** Cell size that fits the calendar into its panel, shared with the hour grid. @param {number} width @param {number} weeks */
 function calendarCell(width, weeks) {
-  return clamp(
-    Math.floor((width - HEAT_LABEL_W + HEAT_GAP) / Math.max(weeks, 1)) -
-      HEAT_GAP,
-    9,
-    16,
-  );
+  return clamp(Math.floor((width - HEAT_LABEL_W + HEAT_GAP) / Math.max(weeks, 1)) - HEAT_GAP, 9, 16);
 }
 
 /**
@@ -1909,10 +1681,8 @@ function calendarCell(width, weeks) {
 function cellTooltips(root, content) {
   root.addEventListener("pointermove", (e) => {
     const t = e.target;
-    const i =
-      t instanceof SVGElement && t.dataset.i !== undefined
-        ? Number(t.dataset.i)
-        : -1;
+    const i = t instanceof SVGElement && t.dataset.i !== undefined ? Number(t.dataset.i) : -1;
+
     if (i < 0) hideTip();
     else showPoint(content(i), e.clientX, e.clientY);
   });
@@ -1928,8 +1698,7 @@ function renderHeat() {
   const hourHost = byId("heat-hours");
   const { lo, hi } = view;
   const perDay = groupSum(pass, byDay, NDAYS);
-  const spent =
-    hi >= lo ? arraySum(Array.from(perDay.subarray(lo, hi + 1))) : 0;
+  const spent = hi >= lo ? arraySum(Array.from(perDay.subarray(lo, hi + 1))) : 0;
 
   byId("heat-legend").hidden = !(spent > 0);
   if (!(spent > 0)) {
@@ -1952,11 +1721,7 @@ function renderHeat() {
     const width = HEAT_LABEL_W + weeks * pitch - HEAT_GAP;
     const root = svg("svg", { width, height: top + 7 * pitch - HEAT_GAP });
 
-    [0, 2, 4].forEach((row) =>
-      root.append(
-        svg("text", { x: 0, y: top + row * pitch + s - 2 }, [WEEKDAYS[row]]),
-      ),
-    );
+    [0, 2, 4].forEach((row) => root.append(svg("text", { x: 0, y: top + row * pitch + s - 2 }, [WEEKDAYS[row]])));
 
     // Month labels sit over the week that holds the 1st, left to right without overlap.
     let lastEnd = -Infinity;
@@ -1966,17 +1731,9 @@ function renderHeat() {
       if (dom !== 1 && !first) continue;
 
       const x = HEAT_LABEL_W + (dayWeek[d] - week0) * pitch;
-      const nextStart = data.days.findIndex(
-        (s2, k) => k > d && s2.endsWith("-01"),
-      );
+      const nextStart = data.days.findIndex((s2, k) => k > d && s2.endsWith("-01"));
 
-      if (
-        first &&
-        dom !== 1 &&
-        nextStart >= 0 &&
-        dayWeek[nextStart] - dayWeek[d] < 3
-      )
-        continue;
+      if (first && dom !== 1 && nextStart >= 0 && dayWeek[nextStart] - dayWeek[d] < 3) continue;
       if (x < lastEnd + 6) continue;
 
       root.append(svg("text", { x, y: 10 }, [MONTHS[m - 1]]));
@@ -2004,10 +1761,7 @@ function renderHeat() {
     }));
 
     calHost.setAttribute("role", "img");
-    calHost.setAttribute(
-      "aria-label",
-      `Calendar heat map of daily spend, ${weeks} weeks, ${usd(spent)} in total.`,
-    );
+    calHost.setAttribute("aria-label", `Calendar heat map of daily spend, ${weeks} weeks, ${usd(spent)} in total.`);
     calHost.replaceChildren(root);
     calHost.scrollLeft = calHost.scrollWidth;
   });
@@ -2024,17 +1778,11 @@ function renderHeat() {
     if (v > grid[peak]) peak = k;
   });
 
-  byId("cap-when").textContent =
-    `busiest slot ${WEEKDAYS_PLURAL[Math.floor(peak / 24)]} around ${pad(peak % 24)}:00`;
+  byId("cap-when").textContent = `busiest slot ${WEEKDAYS_PLURAL[Math.floor(peak / 24)]} around ${pad(peak % 24)}:00`;
 
   mount(hourHost, () => {
     const s = calendarCell(calHost.clientWidth, weeks);
-    const cw = clamp(
-      Math.floor((hourHost.clientWidth - HEAT_LABEL_W + HEAT_GAP) / 24) -
-        HEAT_GAP,
-      9,
-      30,
-    );
+    const cw = clamp(Math.floor((hourHost.clientWidth - HEAT_LABEL_W + HEAT_GAP) / 24) - HEAT_GAP, 9, 30);
 
     const pitchX = cw + HEAT_GAP;
     const pitchY = s + HEAT_GAP;
@@ -2044,16 +1792,10 @@ function renderHeat() {
       height: top + 7 * pitchY - HEAT_GAP,
     });
 
-    [0, 2, 4].forEach((row) =>
-      root.append(
-        svg("text", { x: 0, y: top + row * pitchY + s - 2 }, [WEEKDAYS[row]]),
-      ),
-    );
+    [0, 2, 4].forEach((row) => root.append(svg("text", { x: 0, y: top + row * pitchY + s - 2 }, [WEEKDAYS[row]])));
 
     [0, 6, 12, 18].forEach((hour) =>
-      root.append(
-        svg("text", { x: HEAT_LABEL_W + hour * pitchX, y: 10 }, [String(hour)]),
-      ),
+      root.append(svg("text", { x: HEAT_LABEL_W + hour * pitchX, y: 10 }, [String(hour)])),
     );
 
     grid.forEach((v, k) => {
@@ -2077,10 +1819,7 @@ function renderHeat() {
     }));
 
     hourHost.setAttribute("role", "img");
-    hourHost.setAttribute(
-      "aria-label",
-      `Heat map of spend by hour and weekday. ${byId("cap-when").textContent}.`,
-    );
+    hourHost.setAttribute("aria-label", `Heat map of spend by hour and weekday. ${byId("cap-when").textContent}.`);
     hourHost.replaceChildren(root);
   });
 }
@@ -2117,9 +1856,7 @@ const TOKEN_KINDS = [
 function splitBlock(label, values, format) {
   const total = arraySum(values);
   const bar = h("div", { class: "split-bar", attrs: { role: "img" } });
-  const summary = TOKEN_KINDS.map(
-    (k, i) => `${k.name} ${pct(values[i], total)}`,
-  ).join(", ");
+  const summary = TOKEN_KINDS.map((k, i) => `${k.name} ${pct(values[i], total)}`).join(", ");
   bar.setAttribute("aria-label", `${label}: ${summary}`);
 
   for (let i = 0; i < values.length; i++) {
@@ -2144,18 +1881,12 @@ function splitBlock(label, values, format) {
     }),
   );
 
-  return h("div", { class: "split" }, [
-    h("div", { class: "split-label", text: label }),
-    bar,
-    legend,
-  ]);
+  return h("div", { class: "split" }, [h("div", { class: "split-label", text: label }), bar, legend]);
 }
 
 function renderTokens() {
   const pass = matcher();
-  const tokens = [F.input, F.output, F.cacheWrite, F.cacheRead].map((arr) =>
-    sumOf(pass, (i) => arr[i]),
-  );
+  const tokens = [F.input, F.output, F.cacheWrite, F.cacheRead].map((arr) => sumOf(pass, (i) => arr[i]));
   const costs = categoryCost.map((arr) => sumOf(pass, (i) => arr[i]));
   const totalTokens = arraySum(tokens);
   const totalCost = arraySum(costs);
@@ -2173,16 +1904,14 @@ function renderTokens() {
     return;
   }
 
-  byId("cap-tokens").textContent =
-    `${compact(totalTokens)} tokens, ${usd(sumOf(pass))}`;
+  byId("cap-tokens").textContent = `${compact(totalTokens)} tokens, ${usd(sumOf(pass))}`;
 
   const uncached = sumOf(pass, (i) => F.uncachedCost[i]);
   const spent = sumOf(pass);
   const readTokens = pct(tokens[3], totalTokens).replace("<", "under ");
   const readCost = pct(costs[3], totalCost).replace("<", "under ");
   let sentence = `Cache reads are ${readTokens} of tokens and ${readCost} of cost.`;
-  if (uncached > spent)
-    sentence += ` Without caching this range would have cost ${usd(uncached)}.`;
+  if (uncached > spent) sentence += ` Without caching this range would have cost ${usd(uncached)}.`;
 
   fill(host, [
     splitBlock("tokens", tokens, compact),
@@ -2226,8 +1955,7 @@ function renderAgents() {
   ];
   const subTotal = arraySum(cols.map((c) => c.values[1]));
 
-  byId("cap-agents").textContent =
-    `subagents are ${Math.round((subTotal / total) * 100)}% of spend`;
+  byId("cap-agents").textContent = `subagents are ${Math.round((subTotal / total) * 100)}% of spend`;
   renderLegend(byId("legend-agents"), segs);
 
   mount(host, () =>
@@ -2257,9 +1985,7 @@ function renderAgents() {
 // =============================================================================
 
 function renderFooter() {
-  const unique = (/** @type {string[]} */ list) => [
-    ...new Set(list.filter(Boolean)),
-  ];
+  const unique = (/** @type {string[]} */ list) => [...new Set(list.filter(Boolean))];
   const regions = unique(data.profiles.map((p) => p.region));
   const files = unique(data.profiles.map((p) => p.pricingFile));
   const when = `${fmtMDY(generated.date)}, ${generated.time}`;
@@ -2273,19 +1999,13 @@ function renderFooter() {
     "Estimates priced from local transcripts. Check the GCP Billing export for real numbers.",
   ];
 
-  if (w.unknownModels.length)
-    lines.push(`Unknown models priced at $0: ${w.unknownModels.join(", ")}`);
-  if (w.notInRegion.length)
-    lines.push(`Not offered at the endpoint: ${w.notInRegion.join(", ")}`);
+  if (w.unknownModels.length) lines.push(`Unknown models priced at $0: ${w.unknownModels.join(", ")}`);
+  if (w.notInRegion.length) lines.push(`Not offered at the endpoint: ${w.notInRegion.join(", ")}`);
   if (w.archivedTranscripts > 0) {
-    lines.push(
-      `Includes ${plural(w.archivedTranscripts, "deleted transcript")} kept in the usage store.`,
-    );
+    lines.push(`Includes ${plural(w.archivedTranscripts, "deleted transcript")} kept in the usage store.`);
   }
   if (w.skippedUndated > 0)
-    lines.push(
-      `${plural(w.skippedUndated, "message")} with a missing or implausible date left out of the charts.`,
-    );
+    lines.push(`${plural(w.skippedUndated, "message")} with a missing or implausible date left out of the charts.`);
 
   fill(
     byId("foot"),

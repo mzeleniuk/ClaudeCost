@@ -5,11 +5,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { usageTokenTotal } from "./dedupe.js";
-import {
-  eventsFromRecord,
-  findTranscripts,
-  scanUsageRecords,
-} from "./parse.js";
+import { eventsFromRecord, findTranscripts, scanUsageRecords } from "./parse.js";
 import { isPlainObject } from "./validate.js";
 
 /** @import { StoreEntry, UsageEvent, UsageRecord } from "./types.js" */
@@ -41,8 +37,7 @@ const printWarning = (message) => {
  */
 export function storeFileName(realDir) {
   const rel = path.relative(os.homedir(), realDir);
-  const underHome =
-    rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
+  const underHome = rel !== "" && !rel.startsWith("..") && !path.isAbsolute(rel);
   const slug =
     (underHome ? rel : realDir)
       .split(path.sep)
@@ -304,9 +299,7 @@ function saveStore(file, realDir, files, warn) {
     fs.renameSync(temp, file);
   } catch (error) {
     fs.rmSync(temp, { force: true });
-    warn(
-      `could not save usage store ${file}: ${/** @type {Error} */ (error).message}`,
-    );
+    warn(`could not save usage store ${file}: ${/** @type {Error} */ (error).message}`);
   }
 }
 
@@ -323,18 +316,13 @@ function saveStore(file, realDir, files, warn) {
  */
 async function refreshEntry(file, stats, entry) {
   if (entry && entry.offset <= stats.size) {
-    const unchanged =
-      stats.size === entry.size && stats.mtimeMs === entry.mtimeMs;
+    const unchanged = stats.size === entry.size && stats.mtimeMs === entry.mtimeMs;
 
     if (unchanged && entry.offset === stats.size) {
       return { entry, tail: [], updated: false };
     }
 
-    if (
-      unchanged ||
-      (stats.size > entry.size &&
-        (await checkAt(file, entry.offset)) === entry.check)
-    ) {
+    if (unchanged || (stats.size > entry.size && (await checkAt(file, entry.offset)) === entry.check)) {
       const scan = await scanUsageRecords(file, entry.offset);
       if (unchanged) return { entry, tail: scan.tail, updated: false };
 

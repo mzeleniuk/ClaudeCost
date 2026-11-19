@@ -18,8 +18,7 @@ export const warn = (text) => styleText("yellow", text);
 const accent = (text) => styleText("magenta", text);
 
 /** @param {number} n */
-export const fmtUSD = (n) =>
-  n > 0 && n < 0.005 ? "<$0.01" : `$${n.toFixed(2)}`;
+export const fmtUSD = (n) => (n > 0 && n < 0.005 ? "<$0.01" : `$${n.toFixed(2)}`);
 
 /** @param {number} n */
 export const fmtNum = (n) => n.toLocaleString("en-US");
@@ -102,14 +101,9 @@ export const byCostDesc = (rows) => {
  * @param {{ label?: string, columns?: Column[] }} [opts]
  * @returns {string[][]} Lines for each block, without indentation.
  */
-export function renderGrid(
-  blocks,
-  { label = "model", columns = USAGE_COLUMNS } = {},
-) {
+export function renderGrid(blocks, { label = "model", columns = USAGE_COLUMNS } = {}) {
   /** @type {[string, Totals][]} */
-  const all = blocks.flatMap((b) =>
-    b.total ? [...b.rows, ["total", b.total]] : b.rows,
-  );
+  const all = blocks.flatMap((b) => (b.total ? [...b.rows, ["total", b.total]] : b.rows));
 
   const labelWidth = Math.max(
     label.length,
@@ -117,21 +111,14 @@ export function renderGrid(
     ...all.map(([name]) => name.length),
   );
 
-  const widths = columns.map((col) =>
-    Math.max(col.header.length, ...all.map(([, t]) => col.value(t).length)),
-  );
-
+  const widths = columns.map((col) => Math.max(col.header.length, ...all.map(([, t]) => col.value(t).length)));
   const ruleWidth = labelWidth + widths.reduce((sum, w) => sum + w + 2, 1);
 
   /**
    * @param {string} name
    * @param {string[]} cells
    */
-  const line = (name, cells) =>
-    [
-      name.padEnd(labelWidth + 1),
-      ...cells.map((c, i) => c.padStart(widths[i])),
-    ].join("  ");
+  const line = (name, cells) => [name.padEnd(labelWidth + 1), ...cells.map((c, i) => c.padStart(widths[i]))].join("  ");
 
   return blocks.map(({ title, rows, total }) => {
     const header = line(
@@ -139,12 +126,7 @@ export function renderGrid(
       columns.map((c) => c.header),
     );
 
-    const lines = [
-      title
-        ? bold(title.padEnd(labelWidth + 1)) + dim(header.slice(labelWidth + 1))
-        : dim(header),
-    ];
-
+    const lines = [title ? bold(title.padEnd(labelWidth + 1)) + dim(header.slice(labelWidth + 1)) : dim(header)];
     const blockCost = total?.costUSD ?? 0;
 
     for (const [name, totals] of rows) {
@@ -153,11 +135,7 @@ export function renderGrid(
         columns.map((c) => c.value(totals)),
       );
 
-      const bar =
-        rows.length > 1 && blockCost > 0
-          ? shareBar(totals.costUSD / blockCost)
-          : "";
-
+      const bar = rows.length > 1 && blockCost > 0 ? shareBar(totals.costUSD / blockCost) : "";
       lines.push(bar ? `${row}  ${bar}` : row);
     }
 

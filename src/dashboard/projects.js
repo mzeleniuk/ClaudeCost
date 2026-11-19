@@ -52,10 +52,7 @@ const MAX_STEPS = 500;
 // Temp directories that are gone by the time the dashboard runs. The prefix
 // is the same for all of them, so the label keeps only the part that differs.
 // macOS: /private/var/folders/xx/hash/T/<name>. Linux and macOS: /tmp/<name>.
-const TEMP_PREFIXES = [
-  /^-(?:private-)?var-folders-.+?-T-(.+)$/,
-  /^-(?:private-)?tmp-(.+)$/,
-];
+const TEMP_PREFIXES = [/^-(?:private-)?var-folders-.+?-T-(.+)$/, /^-(?:private-)?tmp-(.+)$/];
 
 /**
  * @param {string} folder
@@ -105,13 +102,7 @@ function walk(dir, segments, listDirs, budget) {
   const longestFirst = [...matches.values()].sort((a, b) => b.count - a.count);
 
   for (const { name, count } of longestFirst) {
-    const found = walk(
-      path.join(dir, name),
-      segments.slice(count),
-      listDirs,
-      budget,
-    );
-
+    const found = walk(path.join(dir, name), segments.slice(count), listDirs, budget);
     if (found) return found;
   }
 
@@ -130,10 +121,7 @@ function walk(dir, segments, listDirs, budget) {
  * @param {string} [opts.home] Home directory. Defaults to the user's.
  * @returns {(folder: string) => DashboardProject}
  */
-export function createProjectDecoder({
-  listDirs = listDirectories,
-  home = os.homedir(),
-} = {}) {
+export function createProjectDecoder({ listDirs = listDirectories, home = os.homedir() } = {}) {
   const encodedHome = encodeCwd(home);
   /** @type {Map<string, DashboardProject>} */
   const cache = new Map();
@@ -177,9 +165,7 @@ export function createProjectDecoder({
   /** @param {string} folder */
   function decode(folder) {
     const start = startOf(folder);
-    const dir = start
-      ? walk(start.root, start.segments, listCached, { left: MAX_STEPS })
-      : null;
+    const dir = start ? walk(start.root, start.segments, listCached, { left: MAX_STEPS }) : null;
 
     const temp = tempLabel(folder);
     let label = folder || "(unknown)";

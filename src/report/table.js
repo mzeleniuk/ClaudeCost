@@ -5,8 +5,7 @@ import { bold, byCostDesc, dim, renderGrid, warn } from "./format.js";
 
 /** @import { AggregateResult, PricingSummary, ReportOptions } from "../types.js" */
 
-export const RECONCILE_NOTE =
-  "Approximate. Reconcile with your GCP Billing export.";
+export const RECONCILE_NOTE = "Approximate. Reconcile with your GCP Billing export.";
 
 // Section bodies sit under the "  ⎿  " branch.
 export const INDENT = "     ";
@@ -30,9 +29,7 @@ export function headingLines(title = "Claude Code usage", subtitle) {
  * @param {string} [region]
  */
 export function scopeLine(since, region) {
-  const parts = [
-    since ? `Since ${formatLocalDateTime(since)} local` : "All history",
-  ];
+  const parts = [since ? `Since ${formatLocalDateTime(since)} local` : "All history"];
 
   if (region && region !== DEFAULT_REGION) {
     parts.push(`region ${describeRegion(region)}`);
@@ -82,10 +79,7 @@ export function warningLines(
  */
 export function archiveLines({ archivedTranscripts }) {
   if (!archivedTranscripts) return [];
-
-  return [
-    `${INDENT}${dim(`Includes ${archivedTranscripts} deleted transcript(s) kept in the usage store.`)}`,
-  ];
+  return [`${INDENT}${dim(`Includes ${archivedTranscripts} deleted transcript(s) kept in the usage store.`)}`];
 }
 
 export const EMPTY_LINE = `${INDENT}${dim("No activity in this period.")}`;
@@ -99,16 +93,9 @@ export const noteLines = (text = RECONCILE_NOTE) => ["", `  ${dim(text)}`];
  * @param {AggregateResult} result
  * @param {ReportOptions & { byModel: boolean }} opts
  */
-export function renderTable(
-  result,
-  { byModel, since, title, subtitle, region, pricingFile, showNote = true },
-) {
+export function renderTable(result, { byModel, since, title, subtitle, region, pricingFile, showNote = true }) {
   const { groups, total } = result;
-  const [grid] = renderGrid([
-    byModel
-      ? { rows: byCostDesc([...groups]), total }
-      : { rows: [["all models", total]] },
-  ]);
+  const [grid] = renderGrid([byModel ? { rows: byCostDesc([...groups]), total } : { rows: [["all models", total]] }]);
 
   const lines = [
     ...headingLines(title, subtitle),

@@ -89,10 +89,7 @@ async function sumEvents(events, { pricing, since }, bucketsFor) {
  * @param {boolean} [opts.byModel]
  * @returns {Promise<AggregateResult>}
  */
-export async function aggregate(
-  events,
-  { pricing, since = null, byModel = false },
-) {
+export async function aggregate(events, { pricing, since = null, byModel = false }) {
   /** @type {Map<string, Totals>} */
   const groups = new Map();
   const summary = await sumEvents(events, { pricing, since }, (event) =>

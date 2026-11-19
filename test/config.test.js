@@ -4,11 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
 
-import {
-  expandHome,
-  defaultTranscriptDirs,
-  resolveTranscriptDirs,
-} from "../src/config.js";
+import { expandHome, defaultTranscriptDirs, resolveTranscriptDirs } from "../src/config.js";
 
 test("expandHome expands ~ and ~/ paths", () => {
   const home = os.homedir();
@@ -21,10 +17,7 @@ test("defaultTranscriptDirs is modern-first projects only", () => {
   const home = os.homedir();
   const dirs = defaultTranscriptDirs({});
 
-  assert.deepEqual(dirs, [
-    path.join(home, ".config", "claude", "projects"),
-    path.join(home, ".claude", "projects"),
-  ]);
+  assert.deepEqual(dirs, [path.join(home, ".config", "claude", "projects"), path.join(home, ".claude", "projects")]);
   assert.ok(!dirs.some((d) => d === path.join(home, ".claude")));
 });
 
@@ -35,23 +28,16 @@ test("resolveTranscriptDirs returns explicit --dir", () => {
 });
 
 test("resolveTranscriptDirs throws for missing --dir", () => {
-  assert.throws(
-    () => resolveTranscriptDirs("/nonexistent/claude-cost-path-xyz"),
-    /transcript directory not found/,
-  );
+  assert.throws(() => resolveTranscriptDirs("/nonexistent/claude-cost-path-xyz"), /transcript directory not found/);
 });
 
 test("defaultTranscriptDirs uses only CLAUDE_CONFIG_DIR when it is set", () => {
   const home = os.homedir();
 
-  assert.deepEqual(
-    defaultTranscriptDirs({ CLAUDE_CONFIG_DIR: "/srv/claude" }),
-    [path.join("/srv/claude", "projects")],
-  );
-  assert.deepEqual(
-    defaultTranscriptDirs({ CLAUDE_CONFIG_DIR: "~/.claude-work" }),
-    [path.join(home, ".claude-work", "projects")],
-  );
+  assert.deepEqual(defaultTranscriptDirs({ CLAUDE_CONFIG_DIR: "/srv/claude" }), [path.join("/srv/claude", "projects")]);
+  assert.deepEqual(defaultTranscriptDirs({ CLAUDE_CONFIG_DIR: "~/.claude-work" }), [
+    path.join(home, ".claude-work", "projects"),
+  ]);
   // An empty value is treated as unset
   assert.equal(defaultTranscriptDirs({ CLAUDE_CONFIG_DIR: " " }).length, 2);
 });
@@ -66,7 +52,5 @@ test("resolveTranscriptDirs reads CLAUDE_CONFIG_DIR and names it when empty", ()
   );
 
   fs.mkdirSync(path.join(root, "projects"));
-  assert.deepEqual(resolveTranscriptDirs(undefined, env), [
-    path.join(root, "projects"),
-  ]);
+  assert.deepEqual(resolveTranscriptDirs(undefined, env), [path.join(root, "projects")]);
 });

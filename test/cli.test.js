@@ -12,24 +12,15 @@ import { run } from "../src/cli.js";
 const BIN = path.join(import.meta.dirname, "..", "bin", "claude-cost.js");
 
 test("rejects --by-model together with --by-month", async () => {
-  await assert.rejects(
-    run(["--by-model", "--by-month"]),
-    /use either --by-model or --by-month, not both/,
-  );
+  await assert.rejects(run(["--by-model", "--by-month"]), /use either --by-model or --by-month, not both/);
 });
 
 test("rejects --no-cache together with --rebuild-cache", async () => {
-  await assert.rejects(
-    run(["--no-cache", "--rebuild-cache"]),
-    /use either --no-cache or --rebuild-cache, not both/,
-  );
+  await assert.rejects(run(["--no-cache", "--rebuild-cache"]), /use either --no-cache or --rebuild-cache, not both/);
 });
 
 test("rejects an empty --out with --dashboard", async () => {
-  await assert.rejects(
-    run(["--dashboard", "--out", ""]),
-    /--out needs a file path/,
-  );
+  await assert.rejects(run(["--dashboard", "--out", ""]), /--out needs a file path/);
 });
 
 test("rejects an invalid --since before scanning anything", async () => {
@@ -93,10 +84,7 @@ function setupProject() {
     },
   ];
 
-  fs.writeFileSync(
-    path.join(session, "session.jsonl"),
-    lines.map((line) => JSON.stringify(line)).join("\n"),
-  );
+  fs.writeFileSync(path.join(session, "session.jsonl"), lines.map((line) => JSON.stringify(line)).join("\n"));
 
   const pricing = path.join(root, "pricing.json");
   const zero = { cacheWrite: 0, cacheWrite1h: 0, cacheRead: 0 };
@@ -135,10 +123,7 @@ test("prints a per-model table with the total and unknown models", async () => {
   const text = stripVTControlCharacters(stdout);
 
   assert.match(text, /^ {5}claude-test-a +1M +1M +0 +0 +1 +\$3\.00  █+/m);
-  assert.match(
-    text,
-    /^ {5}claude-test-b@20260101 +0 +0 +0 +1M +1 +\$4\.00  █+/m,
-  );
+  assert.match(text, /^ {5}claude-test-b@20260101 +0 +0 +0 +1M +1 +\$4\.00  █+/m);
   assert.match(text, /^ {5}total .* 3 +\$7\.00$/m);
   assert.ok(text.includes(`Add them to ${pricing}`));
   assert.match(text, /^ {5}claude-mystery .* \$0\.00$/m);
@@ -168,9 +153,7 @@ test("splits the JSON report by month and applies --since", async () => {
   assert.equal(all.byMonth["2026-10"].total.costUSD, 4);
   assert.equal(all.total.costUSD, 7);
 
-  const recent = JSON.parse(
-    (await cli(["--json", "--by-month", "--since", "2026-10-01"])).stdout,
-  );
+  const recent = JSON.parse((await cli(["--json", "--by-month", "--since", "2026-10-01"])).stdout);
 
   assert.deepEqual(Object.keys(recent.byMonth), ["2026-10"]);
   assert.equal(recent.total.costUSD, 4);
@@ -179,10 +162,7 @@ test("splits the JSON report by month and applies --since", async () => {
 
 test("rejects --dashboard together with the other report modes", async () => {
   for (const flag of ["--json", "--by-model", "--by-month", "--monthly"]) {
-    await assert.rejects(
-      run(["--dashboard", flag]),
-      new RegExp(`use either --dashboard or ${flag}, not both`),
-    );
+    await assert.rejects(run(["--dashboard", flag]), new RegExp(`use either --dashboard or ${flag}, not both`));
   }
 });
 
@@ -191,19 +171,12 @@ test("rejects --out without --dashboard", async () => {
 });
 
 test("has no option to open a browser", async () => {
-  await assert.rejects(
-    run(["--dashboard", "--open"]),
-    /Unknown option '--open'/,
-  );
+  await assert.rejects(run(["--dashboard", "--open"]), /Unknown option '--open'/);
 });
 
 test("writes the dashboard to --out and prints the totals", async () => {
   const { projects, pricing } = setupProject();
-  const out = path.join(
-    fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-out-")),
-    "nested",
-    "d.html",
-  );
+  const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-out-")), "nested", "d.html");
 
   const { stdout } = await promisify(execFile)(process.execPath, [
     BIN,
@@ -221,14 +194,9 @@ test("writes the dashboard to --out and prints the totals", async () => {
   const text = stripVTControlCharacters(stdout);
 
   assert.ok(text.includes(`Dashboard written to ${out}`));
-  assert.ok(
-    text.includes(`Open in your browser: ${pathToFileURL(out).href}\n`),
-  );
+  assert.ok(text.includes(`Open in your browser: ${pathToFileURL(out).href}\n`));
   assert.match(text, /\$7\.00 across 1 session, /);
-  assert.match(
-    text,
-    /^1M input, 1M output, 0 cache read, 1M cache write, 3 messages$/m,
-  );
+  assert.match(text, /^1M input, 1M output, 0 cache read, 1M cache write, 3 messages$/m);
 
   const html = fs.readFileSync(out, "utf8");
 

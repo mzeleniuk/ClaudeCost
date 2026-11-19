@@ -37,13 +37,7 @@ export const REGION_MODELS = {
     "claude-opus-4-8",
     "claude-opus-4-7",
   ],
-  "us-east5": [
-    "claude-opus-4-6",
-    "claude-opus-4-5",
-    "claude-sonnet-4-6",
-    "claude-sonnet-4-5",
-    "claude-haiku-4-5",
-  ],
+  "us-east5": ["claude-opus-4-6", "claude-opus-4-5", "claude-sonnet-4-6", "claude-sonnet-4-5", "claude-haiku-4-5"],
   "europe-west1": [
     "claude-haiku-5-5",
     "claude-opus-4-6",
@@ -76,9 +70,7 @@ const LISTED_KEYS = new Set(Object.values(REGION_MODELS).flat());
  */
 export function validateRegion(region, source) {
   if (!REGIONS.includes(region)) {
-    throw new Error(
-      `unknown region "${region}" in ${source}. Use one of: ${REGIONS.join(", ")}.`,
-    );
+    throw new Error(`unknown region "${region}" in ${source}. Use one of: ${REGIONS.join(", ")}.`);
   }
 
   return region;

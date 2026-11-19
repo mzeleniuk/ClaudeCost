@@ -53,9 +53,7 @@ export const STYLES = [
 
 /** @param {string} dir Folder with the styles folder. */
 function readStyles(dir) {
-  return STYLES.map((name) =>
-    fs.readFileSync(path.join(dir, "styles", `${name}.css`), "utf8"),
-  ).join("\n\n");
+  return STYLES.map((name) => fs.readFileSync(path.join(dir, "styles", `${name}.css`), "utf8")).join("\n\n");
 }
 
 /**
@@ -67,19 +65,14 @@ function readStyles(dir) {
  * @param {{ dir?: string }} [opts] Folder with template.html, app.js and a styles folder of .css files.
  */
 export function renderDashboard(data, { dir = DIR } = {}) {
-  const read = (/** @type {string} */ name) =>
-    fs.readFileSync(path.join(dir, name), "utf8");
-
+  const read = (/** @type {string} */ name) => fs.readFileSync(path.join(dir, name), "utf8");
   const template = read("template.html");
-
   const icons = Object.keys(ICONS).filter((m) => template.includes(m));
   const markers = [...MARKERS, ...icons];
 
   for (const marker of markers) {
     if (template.split(marker).length !== 2) {
-      throw new Error(
-        `dashboard template must contain ${marker} exactly once.`,
-      );
+      throw new Error(`dashboard template must contain ${marker} exactly once.`);
     }
   }
 
@@ -91,21 +84,10 @@ export function renderDashboard(data, { dir = DIR } = {}) {
   };
 
   for (const marker of icons) {
-    const png = fs.readFileSync(
-      path.join(
-        dir,
-        "icons",
-        ICONS[/** @type {keyof typeof ICONS} */ (marker)],
-      ),
-    );
-
+    const png = fs.readFileSync(path.join(dir, "icons", ICONS[/** @type {keyof typeof ICONS} */ (marker)]));
     values[marker] = `data:image/png;base64,${png.toString("base64")}`;
   }
 
-  const pattern = new RegExp(
-    markers.map((m) => m.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")).join("|"),
-    "g",
-  );
-
+  const pattern = new RegExp(markers.map((m) => m.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")).join("|"), "g");
   return template.replace(pattern, (marker) => values[marker]);
 }

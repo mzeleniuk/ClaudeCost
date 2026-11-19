@@ -1,0 +1,18 @@
+#!/bin/sh
+# Runs the full set of checks before anything is pushed.
+
+set -e
+
+cd "$(git rev-parse --show-toplevel)"
+
+echo "pre-push: checking formatting"
+npm run --silent format:check
+
+echo "pre-push: running lint"
+npm run --silent lint
+
+echo "pre-push: running typecheck"
+npm run --silent typecheck
+
+echo "pre-push: running tests"
+npm test --silent

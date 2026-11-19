@@ -1,15 +1,7 @@
 // @ts-check
 import { sortedMonths } from "../aggregate.js";
 import { bold, byCostDesc, dim, fmtNum, fmtUSD, renderGrid } from "./format.js";
-import {
-  EMPTY_LINE,
-  INDENT,
-  archiveLines,
-  headingLines,
-  noteLines,
-  scopeLine,
-  warningLines,
-} from "./table.js";
+import { EMPTY_LINE, INDENT, archiveLines, headingLines, noteLines, scopeLine, warningLines } from "./table.js";
 
 /** @import { MonthlyResult, ReportOptions } from "../types.js" */
 
@@ -33,10 +25,7 @@ function monthName(key) {
  * @param {MonthlyResult} result
  * @param {ReportOptions} opts
  */
-export function renderMonthlyTable(
-  result,
-  { since, title, subtitle, region, pricingFile, showNote = true },
-) {
+export function renderMonthlyTable(result, { since, title, subtitle, region, pricingFile, showNote = true }) {
   const { months, total, skippedUndated } = result;
   const grids = renderGrid(
     sortedMonths(months).map(([key, month]) => ({

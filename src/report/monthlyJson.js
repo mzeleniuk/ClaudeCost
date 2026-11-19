@@ -22,9 +22,7 @@ export function buildMonthlyProfile({
 
   for (const [key, month] of sortedMonths(months)) {
     byMonth[key] = {
-      models: Object.fromEntries(
-        [...month.models].map(([model, totals]) => [model, roundCost(totals)]),
-      ),
+      models: Object.fromEntries([...month.models].map(([model, totals]) => [model, roundCost(totals)])),
       total: roundCost(month.total),
     };
   }

@@ -8,11 +8,7 @@ import { DEFAULT_STORE_DIR } from "./store.js";
 import { readJsonObject } from "./validate.js";
 
 /** Local settings. Sits next to pricing.config.json and is not committed. */
-export const DEFAULT_SETTINGS_PATH = path.join(
-  import.meta.dirname,
-  "..",
-  "settings.config.json",
-);
+export const DEFAULT_SETTINGS_PATH = path.join(import.meta.dirname, "..", "settings.config.json");
 
 const KNOWN_KEYS = new Set(["region", "storeDir"]);
 
@@ -46,9 +42,7 @@ export function loadSettings(filePath = DEFAULT_SETTINGS_PATH) {
 
   if (parsed.storeDir !== undefined) {
     if (typeof parsed.storeDir !== "string" || parsed.storeDir.trim() === "") {
-      throw new Error(
-        `invalid storeDir in ${filePath}: expected a non-empty string`,
-      );
+      throw new Error(`invalid storeDir in ${filePath}: expected a non-empty string`);
     }
 
     settings.storeDir = resolveUserPath(parsed.storeDir.trim(), filePath);

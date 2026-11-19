@@ -26,10 +26,7 @@ export function writeDashboardFile(file, html) {
  * @param {{ windows?: boolean }} [opts] Build a Windows link. Defaults to the
  *   current platform.
  */
-export function fileLink(
-  file,
-  { windows = process.platform === "win32" } = {},
-) {
+export function fileLink(file, { windows = process.platform === "win32" } = {}) {
   return pathToFileURL(file, { windows }).href;
 }
 

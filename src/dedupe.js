@@ -8,12 +8,7 @@
  * @param {Pick<Usage, "input" | "output" | "cacheWrite" | "cacheRead">} usage
  */
 export function usageTokenTotal(usage) {
-  return (
-    (usage.input ?? 0) +
-    (usage.output ?? 0) +
-    (usage.cacheWrite ?? 0) +
-    (usage.cacheRead ?? 0)
-  );
+  return (usage.input ?? 0) + (usage.output ?? 0) + (usage.cacheWrite ?? 0) + (usage.cacheRead ?? 0);
 }
 
 /**

@@ -1,0 +1,16 @@
+#!/bin/sh
+# Checks formatting of staged files and syntax of the JavaScript sources.
+
+set -e
+
+cd "$(git rev-parse --show-toplevel)"
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+
+if [ -n "$staged" ]; then
+  echo "pre-commit: checking formatting of staged files"
+  echo "$staged" | tr '\n' '\0' | xargs -0 npx --no-install prettier --check --ignore-unknown
+fi
+
+echo "pre-commit: running lint"
+npm run --silent lint

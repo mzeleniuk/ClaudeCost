@@ -74,9 +74,7 @@ export function normalizeUsage(raw = {}) {
 
   const cacheWrite5m = hasBreakdown ? breakdown5m : 0;
   const cacheWrite1h = hasBreakdown ? breakdown1h : 0;
-  const cacheWrite = hasBreakdown
-    ? cacheWrite5m + cacheWrite1h
-    : (raw.cache_creation_input_tokens ?? 0);
+  const cacheWrite = hasBreakdown ? cacheWrite5m + cacheWrite1h : (raw.cache_creation_input_tokens ?? 0);
 
   return {
     cacheRead: raw.cache_read_input_tokens ?? 0,
@@ -91,12 +89,7 @@ export function normalizeUsage(raw = {}) {
 
 /** @param {Usage} usage */
 function hasBillableTokens(usage) {
-  return (
-    usage.input > 0 ||
-    usage.output > 0 ||
-    usage.cacheRead > 0 ||
-    usage.cacheWrite > 0
-  );
+  return usage.input > 0 || usage.output > 0 || usage.cacheRead > 0 || usage.cacheWrite > 0;
 }
 
 /**
@@ -282,8 +275,7 @@ export async function scanUsageRecords(file, start = 0) {
 
     collect(complete, records);
     end += complete.length;
-    pending =
-      lastNewline + 1 < chunk.length ? [chunk.subarray(lastNewline + 1)] : [];
+    pending = lastNewline + 1 < chunk.length ? [chunk.subarray(lastNewline + 1)] : [];
   }
 
   /** @type {UsageRecord[]} */

@@ -40,11 +40,7 @@ export function defaultTranscriptDirs(env = process.env) {
   if (configDir) return [path.join(expandHome(configDir), "projects")];
 
   const home = os.homedir();
-
-  return [
-    path.join(home, ".config", "claude", "projects"),
-    path.join(home, ".claude", "projects"),
-  ];
+  return [path.join(home, ".config", "claude", "projects"), path.join(home, ".claude", "projects")];
 }
 
 /**
@@ -88,13 +84,8 @@ export function resolveTranscriptDirs(explicitDir, env = process.env) {
   }
 
   if (found.length === 0) {
-    const where = env.CLAUDE_CONFIG_DIR?.trim()
-      ? ` in CLAUDE_CONFIG_DIR (${env.CLAUDE_CONFIG_DIR.trim()})`
-      : "";
-
-    throw new Error(
-      `could not locate Claude Code transcripts${where}. Pass --dir <path> explicitly.`,
-    );
+    const where = env.CLAUDE_CONFIG_DIR?.trim() ? ` in CLAUDE_CONFIG_DIR (${env.CLAUDE_CONFIG_DIR.trim()})` : "";
+    throw new Error(`could not locate Claude Code transcripts${where}. Pass --dir <path> explicitly.`);
   }
   return found;
 }

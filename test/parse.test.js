@@ -4,12 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import {
-  findTranscripts,
-  readUsageEvents,
-  normalizeUsage,
-  advisorUsagesFromRaw,
-} from "../src/parse.js";
+import { findTranscripts, readUsageEvents, normalizeUsage, advisorUsagesFromRaw } from "../src/parse.js";
 
 const FIXTURES = path.join(import.meta.dirname, "fixtures");
 const SAMPLE = path.join(FIXTURES, "sample.jsonl");
@@ -37,15 +32,7 @@ test("readUsageEvents skips corrupt lines and all-zero usage", async () => {
   const events = [];
   for await (const ev of readUsageEvents(SAMPLE)) events.push(ev);
 
-  assert.ok(
-    events.every(
-      (ev) =>
-        ev.usage.input ||
-        ev.usage.output ||
-        ev.usage.cacheRead ||
-        ev.usage.cacheWrite,
-    ),
-  );
+  assert.ok(events.every((ev) => ev.usage.input || ev.usage.output || ev.usage.cacheRead || ev.usage.cacheWrite));
 });
 
 test("readUsageEvents tolerates missing or invalid timestamps", async () => {
@@ -85,10 +72,7 @@ test("normalizeUsage falls back to flat cache_creation_input_tokens", () => {
 });
 
 test("normalizeUsage uses the flat count when the breakdown is empty", () => {
-  for (const cache_creation of [
-    {},
-    { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 0 },
-  ]) {
+  for (const cache_creation of [{}, { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 0 }]) {
     const u = normalizeUsage({
       cache_creation_input_tokens: 1_000_000,
       cache_creation,
@@ -144,9 +128,7 @@ test("readUsageEvents expands advisor_message iterations", async () => {
   assert.equal(parent.usage.output, 2);
   assert.equal(parent.requestId, "req-advisor");
 
-  const advisors = events.filter((ev) =>
-    String(ev.messageId ?? "").startsWith("msg-advisor:advisor:"),
-  );
+  const advisors = events.filter((ev) => String(ev.messageId ?? "").startsWith("msg-advisor:advisor:"));
   assert.equal(advisors.length, 2);
   assert.equal(advisors[0].messageId, "msg-advisor:advisor:0");
   assert.equal(advisors[0].model, "claude-opus-4");

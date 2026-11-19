@@ -11,12 +11,7 @@ import { loadSettings } from "./settings.js";
 import { parseSince, startOfMonth } from "./since.js";
 import { expandHome, resolveTranscriptDirs } from "./config.js";
 import { collectDashboard } from "./dashboard/collect.js";
-import {
-  fileLink,
-  summarizeDashboard,
-  summarizeTokens,
-  writeDashboardFile,
-} from "./dashboard/output.js";
+import { fileLink, summarizeDashboard, summarizeTokens, writeDashboardFile } from "./dashboard/output.js";
 import { renderDashboard } from "./dashboard/render.js";
 import { renderJson } from "./report/json.js";
 import { renderMonthlyJson } from "./report/monthlyJson.js";
@@ -117,10 +112,7 @@ EXAMPLES
  * @param {{ pricing: PricingTable, since: Date | null, byModel: boolean, byMonth: boolean, store: StoreMode }} opts
  * @returns {Promise<AggregateResult | MonthlyResult>}
  */
-async function collectReport(
-  dirs,
-  { pricing, since, byModel, byMonth, store },
-) {
+async function collectReport(dirs, { pricing, since, byModel, byMonth, store }) {
   const deduped = await readEvents(dirs, store);
 
   if (byMonth) {
@@ -134,17 +126,12 @@ async function collectReport(
  * @param {AggregateResult | MonthlyResult} result
  * @param {{ byMonth: boolean, byModel: boolean, since: Date | null, region: string, pricingFile: string, json: boolean }} opts
  */
-function renderSingle(
-  result,
-  { byMonth, byModel, since, region, pricingFile, json },
-) {
+function renderSingle(result, { byMonth, byModel, since, region, pricingFile, json }) {
   if (byMonth) {
     const monthly = /** @type {MonthlyResult} */ (result);
     const opts = { since, region, pricingFile };
 
-    return json
-      ? renderMonthlyJson(monthly, opts)
-      : renderMonthlyTable(monthly, opts);
+    return json ? renderMonthlyJson(monthly, opts) : renderMonthlyTable(monthly, opts);
   }
 
   const totals = /** @type {AggregateResult} */ (result);
@@ -186,14 +173,7 @@ function resolveSource({ profile, pricingFlag, regionFlag, settings }) {
  * @param {Date | null} opts.since
  * @param {StoreMode} opts.store
  */
-async function collectDashboardData({
-  profiles,
-  flags,
-  regionFlag,
-  settings,
-  since,
-  store,
-}) {
+async function collectDashboardData({ profiles, flags, regionFlag, settings, since, store }) {
   /** @type {DashboardSource[]} */
   const sources = [];
 
@@ -291,12 +271,7 @@ export async function run(argv) {
   }
 
   if (values.dashboard) {
-    const conflicts = /** @type {const} */ ([
-      "json",
-      "by-model",
-      "by-month",
-      "monthly",
-    ]);
+    const conflicts = /** @type {const} */ (["json", "by-model", "by-month", "monthly"]);
 
     for (const flag of conflicts) {
       if (values[flag]) {
@@ -314,8 +289,7 @@ export async function run(argv) {
   const byModel = values["by-model"];
   const byMonth = values["by-month"];
   const since = values.monthly ? startOfMonth() : parseSince(values.since);
-  const regionFlag =
-    values.region != null ? validateRegion(values.region, "--region") : null;
+  const regionFlag = values.region != null ? validateRegion(values.region, "--region") : null;
   const settings = loadSettings();
   const profiles = values.dir ? null : loadProfiles();
   /** @type {StoreMode} */

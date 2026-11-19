@@ -9,19 +9,14 @@ import { formatJson, roundCost } from "./format.js";
  * @param {AggregateResult} result
  * @param {{ byModel: boolean }} opts
  */
-export function buildUsageProfile(
-  { archivedTranscripts, groups, notInRegion, total, unknownModels },
-  { byModel },
-) {
+export function buildUsageProfile({ archivedTranscripts, groups, notInRegion, total, unknownModels }, { byModel }) {
   return {
     archivedTranscripts,
     notInRegion,
     total: roundCost(total),
     unknownModels,
     ...(byModel && {
-      byModel: Object.fromEntries(
-        [...groups].map(([model, totals]) => [model, roundCost(totals)]),
-      ),
+      byModel: Object.fromEntries([...groups].map(([model, totals]) => [model, roundCost(totals)])),
     }),
   };
 }

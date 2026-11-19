@@ -80,9 +80,7 @@ export function locateTranscript(dirs, file) {
     if (relative[0] !== ".." && !path.isAbsolute(relative[0])) {
       // A session file, or a session's subagents folder, right inside `dir`
       // means `dir` is one project folder, as with --dir on a single project.
-      const inProject =
-        relative.length === 1 ||
-        (relative.length === 3 && relative[1] === "subagents");
+      const inProject = relative.length === 1 || (relative.length === 3 && relative[1] === "subagents");
 
       parts = inProject ? [path.basename(dir), ...relative] : relative;
       break;
@@ -132,9 +130,7 @@ function daysBetween(first, last) {
   const days = [];
 
   for (let i = 0; ; i += 1) {
-    const key = /** @type {string} */ (
-      dayKey(new Date(year, month - 1, day + i))
-    );
+    const key = /** @type {string} */ (dayKey(new Date(year, month - 1, day + i)));
 
     days.push(key);
     if (key >= last) return days;
@@ -170,11 +166,7 @@ function rankByCost(totals) {
  */
 export function collectDashboard(
   sources,
-  {
-    since = null,
-    now = new Date(),
-    decodeProject = createProjectDecoder(),
-  } = {},
+  { since = null, now = new Date(), decodeProject = createProjectDecoder() } = {},
 ) {
   /** @type {Map<string, number>} */
   const modelIndexes = new Map();
@@ -202,12 +194,7 @@ export function collectDashboard(
 
       const day = dayKey(event.ts);
 
-      if (
-        !day ||
-        !event.ts ||
-        event.ts < EARLIEST_PLAUSIBLE ||
-        event.ts.getTime() > now.getTime() + DAY_MS
-      ) {
+      if (!day || !event.ts || event.ts < EARLIEST_PLAUSIBLE || event.ts.getTime() > now.getTime() + DAY_MS) {
         skippedUndated += 1;
         continue;
       }
@@ -220,8 +207,7 @@ export function collectDashboard(
 
       const { usage } = event;
       const parts = costBreakdown(price, usage);
-      const cost =
-        parts.input + parts.output + parts.cacheWrite + parts.cacheRead;
+      const cost = parts.input + parts.output + parts.cacheWrite + parts.cacheRead;
       const uncached = costBreakdown(price, {
         input: usage.input + usage.cacheRead + usage.cacheWrite,
         output: usage.output,
@@ -241,9 +227,7 @@ export function collectDashboard(
       const model = indexFor(modelIndexes, event.model);
       const project = indexFor(folderIndexes, location.folder);
       const hour = event.ts.getHours();
-      const key = [day, hour, profile, model, project, location.subagent].join(
-        "\t",
-      );
+      const key = [day, hour, profile, model, project, location.subagent].join("\t");
 
       let cell = cells.get(key);
 
@@ -317,9 +301,7 @@ export function collectDashboard(
   // Run to today, so "last 7 days" means the last 7 calendar days even when
   // the latest usage is older.
   const today = dayKey(now) ?? lastDay;
-  const days = firstDay
-    ? daysBetween(firstDay, lastDay > today ? lastDay : today)
-    : [];
+  const days = firstDay ? daysBetween(firstDay, lastDay > today ? lastDay : today) : [];
   const dayIndexes = new Map(days.map((day, i) => [day, i]));
 
   const rows = [...cells.values()]
@@ -346,13 +328,7 @@ export function collectDashboard(
       firstDay: /** @type {number} */ (dayIndexes.get(session.first)),
       lastDay: /** @type {number} */ (dayIndexes.get(session.last)),
     }))
-    .sort(
-      (a, b) =>
-        a.firstDay - b.firstDay ||
-        a.lastDay - b.lastDay ||
-        a.profile - b.profile ||
-        a.project - b.project,
-    );
+    .sort((a, b) => a.firstDay - b.firstDay || a.lastDay - b.lastDay || a.profile - b.profile || a.project - b.project);
 
   return {
     version: 1,

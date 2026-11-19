@@ -65,10 +65,7 @@ function buildProfilesMonthly(reports, since) {
       region,
       ...buildMonthlyProfile(result),
     })),
-    skippedUndated: reports.reduce(
-      (sum, report) => sum + report.result.skippedUndated,
-      0,
-    ),
+    skippedUndated: reports.reduce((sum, report) => sum + report.result.skippedUndated, 0),
     total: profilesTotal(reports),
   };
 }
@@ -81,21 +78,12 @@ function buildProfilesMonthly(reports, since) {
  * @param {ProfileReport<AggregateResult | MonthlyResult>[]} reports
  * @param {{ byModel: boolean, byMonth: boolean, since: Date | null, json: boolean }} opts
  */
-export function renderProfileReports(
-  reports,
-  { byModel, byMonth, since, json },
-) {
+export function renderProfileReports(reports, { byModel, byMonth, since, json }) {
   if (json) {
     return formatJson(
       byMonth
-        ? buildProfilesMonthly(
-            /** @type {ProfileReport<MonthlyResult>[]} */ (reports),
-            since,
-          )
-        : buildProfilesUsage(
-            /** @type {ProfileReport<AggregateResult>[]} */ (reports),
-            { byModel, since },
-          ),
+        ? buildProfilesMonthly(/** @type {ProfileReport<MonthlyResult>[]} */ (reports), since)
+        : buildProfilesUsage(/** @type {ProfileReport<AggregateResult>[]} */ (reports), { byModel, since }),
     );
   }
 
@@ -120,10 +108,7 @@ export function renderProfileReports(
   const [summary] = renderGrid(
     [
       {
-        rows: reports.map(({ profile, result }) => [
-          profile.name,
-          result.total,
-        ]),
+        rows: reports.map(({ profile, result }) => [profile.name, result.total]),
         total: profilesTotal(reports),
       },
     ],

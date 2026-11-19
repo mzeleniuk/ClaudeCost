@@ -4,20 +4,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import {
-  collectDashboard,
-  locateTranscript,
-} from "../src/dashboard/collect.js";
-import {
-  summarizeDashboard,
-  summarizeTokens,
-} from "../src/dashboard/output.js";
+import { collectDashboard, locateTranscript } from "../src/dashboard/collect.js";
+import { summarizeDashboard, summarizeTokens } from "../src/dashboard/output.js";
 import { createProjectDecoder } from "../src/dashboard/projects.js";
-import {
-  renderDashboard,
-  scriptSafeJson,
-  STYLES,
-} from "../src/dashboard/render.js";
+import { renderDashboard, scriptSafeJson, STYLES } from "../src/dashboard/render.js";
 
 // Round prices so expected costs are easy to check by hand.
 const PRICING = {
@@ -89,29 +79,16 @@ const NOW = new Date(2026, 2, 13, 8, 0);
 
 /** One fact row as an object, for readable assertions. */
 function row(data, i) {
-  return Object.fromEntries(
-    Object.entries(data.facts).map(([key, values]) => [key, values[i]]),
-  );
+  return Object.fromEntries(Object.entries(data.facts).map(([key, values]) => [key, values[i]]));
 }
 
 const events = [
   // bar is seen first but costs the least.
-  event([2026, 2, 10, 9, 30], "claude-test-a", usage(M / 10), [
-    "bar",
-    "s2.jsonl",
-  ]),
+  event([2026, 2, 10, 9, 30], "claude-test-a", usage(M / 10), ["bar", "s2.jsonl"]),
   event([2026, 2, 10, 9, 45], "claude-test-a", usage(M), ["foo", "s1.jsonl"]),
-  event([2026, 2, 10, 9, 50], "claude-test-a", usage(0, M, 2 * M, M), [
-    "foo",
-    "s1.jsonl",
-  ]),
+  event([2026, 2, 10, 9, 50], "claude-test-a", usage(0, M, 2 * M, M), ["foo", "s1.jsonl"]),
   // A subagent of s1, two days later. Day 2026-03-11 has no usage.
-  event([2026, 2, 12, 14, 0], "claude-test-b", usage(M), [
-    "foo",
-    "s1",
-    "subagents",
-    "agent-x.jsonl",
-  ]),
+  event([2026, 2, 12, 14, 0], "claude-test-b", usage(M), ["foo", "s1", "subagents", "agent-x.jsonl"]),
 ];
 
 test("sums facts per day, hour, model, project and agent kind", () => {
@@ -124,9 +101,7 @@ test("sums facts per day, hour, model, project and agent kind", () => {
   assert.equal(data.generatedAt, NOW.toISOString());
   assert.equal(data.since, null);
   assert.equal(data.timezone, Intl.DateTimeFormat().resolvedOptions().timeZone);
-  assert.deepEqual(data.profiles, [
-    { name: "vertex", region: "global", pricingFile: "pricing.config.json" },
-  ]);
+  assert.deepEqual(data.profiles, [{ name: "vertex", region: "global", pricingFile: "pricing.config.json" }]);
 
   // Models and projects are ordered by cost, highest first.
   assert.deepEqual(data.models, ["claude-test-b", "claude-test-a"]);
@@ -212,12 +187,7 @@ test("fills days without usage between the first day and today", () => {
   const data = collectDashboard([source(events)], { now: NOW, decodeProject });
 
   // The last usage is 03-12 and NOW is 03-13, so the last day is idle.
-  assert.deepEqual(data.days, [
-    "2026-03-10",
-    "2026-03-11",
-    "2026-03-12",
-    "2026-03-13",
-  ]);
+  assert.deepEqual(data.days, ["2026-03-10", "2026-03-11", "2026-03-12", "2026-03-13"]);
 });
 
 test("ends days at the last usage when it is ahead of now by under a day", () => {
@@ -230,14 +200,8 @@ test("ends days at the last usage when it is ahead of now by under a day", () =>
 });
 
 test("leaves out timestamps before 2023 or over a day ahead", () => {
-  const early = event([1970, 0, 1, 0, 0], "claude-test-a", usage(M), [
-    "foo",
-    "old.jsonl",
-  ]);
-  const late = event([2026, 2, 20, 9, 0], "claude-test-a", usage(M), [
-    "foo",
-    "future.jsonl",
-  ]);
+  const early = event([1970, 0, 1, 0, 0], "claude-test-a", usage(M), ["foo", "old.jsonl"]);
+  const late = event([2026, 2, 20, 9, 0], "claude-test-a", usage(M), ["foo", "future.jsonl"]);
   const data = collectDashboard([source([...events, early, late])], {
     now: NOW,
     decodeProject,
@@ -252,22 +216,14 @@ test("fills days across a month and year end", () => {
   const data = collectDashboard(
     [
       source([
-        event([2025, 11, 30, 23, 0], "claude-test-a", usage(1), [
-          "p",
-          "a.jsonl",
-        ]),
+        event([2025, 11, 30, 23, 0], "claude-test-a", usage(1), ["p", "a.jsonl"]),
         event([2026, 0, 2, 1, 0], "claude-test-a", usage(1), ["p", "b.jsonl"]),
       ]),
     ],
     { now: new Date(2026, 0, 2, 12, 0), decodeProject },
   );
 
-  assert.deepEqual(data.days, [
-    "2025-12-30",
-    "2025-12-31",
-    "2026-01-01",
-    "2026-01-02",
-  ]);
+  assert.deepEqual(data.days, ["2025-12-30", "2025-12-31", "2026-01-01", "2026-01-02"]);
 });
 
 test("a session spans its main and subagent transcripts", () => {
@@ -286,15 +242,10 @@ test("a session spans its main and subagent transcripts", () => {
 });
 
 test("the same session id in two profiles is two sessions", () => {
-  const second = source(
-    [
-      event([2026, 2, 10, 9, 0], "claude-test-a", usage(M), [
-        "foo",
-        "s1.jsonl",
-      ]),
-    ],
-    { name: "work", region: "us" },
-  );
+  const second = source([event([2026, 2, 10, 9, 0], "claude-test-a", usage(M), ["foo", "s1.jsonl"])], {
+    name: "work",
+    region: "us",
+  });
   const data = collectDashboard([source(events), second], {
     now: NOW,
     decodeProject,
@@ -360,8 +311,7 @@ test("returns empty arrays when there are no events", () => {
 });
 
 test("collects warnings across sources", () => {
-  const archived = (name, file) =>
-    event([2026, 2, 10, 9, 0], name, usage(M), file, { archived: true });
+  const archived = (name, file) => event([2026, 2, 10, 9, 0], name, usage(M), file, { archived: true });
 
   const data = collectDashboard(
     [
@@ -375,10 +325,7 @@ test("collects warnings across sources", () => {
       source(
         [
           archived("claude-mystery", ["foo", "gone.jsonl"]),
-          event([2026, 2, 10, 9, 0], "claude-other", usage(M), [
-            "foo",
-            "t.jsonl",
-          ]),
+          event([2026, 2, 10, 9, 0], "claude-other", usage(M), ["foo", "t.jsonl"]),
         ],
         { name: "work" },
       ),
@@ -397,14 +344,7 @@ test("collects warnings across sources", () => {
 
 test("rounds costs to 6 decimals", () => {
   const data = collectDashboard(
-    [
-      source([
-        event([2026, 2, 10, 9, 0], "claude-test-a", usage(0, 0, 1), [
-          "p",
-          "a.jsonl",
-        ]),
-      ]),
-    ],
+    [source([event([2026, 2, 10, 9, 0], "claude-test-a", usage(0, 0, 1), ["p", "a.jsonl"])])],
     { now: NOW, decodeProject },
   );
 
@@ -412,14 +352,7 @@ test("rounds costs to 6 decimals", () => {
   assert.equal(data.facts.uncachedCost[0], 0.000001);
 
   const third = collectDashboard(
-    [
-      source([
-        event([2026, 2, 10, 9, 0], "claude-test-a", usage(333_333), [
-          "p",
-          "a.jsonl",
-        ]),
-      ]),
-    ],
+    [source([event([2026, 2, 10, 9, 0], "claude-test-a", usage(333_333), ["p", "a.jsonl"])])],
     { now: NOW, decodeProject },
   );
 
@@ -439,16 +372,12 @@ test("locateTranscript reads project, session and agent kind from the path", () 
     session: "abc",
     subagent: 1,
   });
-  assert.equal(
-    locateTranscript(["/other", DIR], path.join(DIR, "p", "s.jsonl")).folder,
-    "p",
-  );
+  assert.equal(locateTranscript(["/other", DIR], path.join(DIR, "p", "s.jsonl")).folder, "p");
 });
 
 test("locateTranscript treats a single project folder as the project", () => {
   const project = path.join(DIR, "-Users-me-foo");
-  const at = (...parts) =>
-    locateTranscript([project], path.join(project, ...parts));
+  const at = (...parts) => locateTranscript([project], path.join(project, ...parts));
 
   assert.deepEqual(at("abc.jsonl"), {
     folder: "-Users-me-foo",
@@ -491,10 +420,7 @@ test("decodes a folder name with hyphens in a directory name", () => {
     folder: "-Users-me-library-npm-vue-components",
     path: "/Users/me/library/npm-vue-components",
   });
-  assert.equal(
-    decode("-Users-me-library-npm-vue").path,
-    "/Users/me/library/npm/vue",
-  );
+  assert.equal(decode("-Users-me-library-npm-vue").path, "/Users/me/library/npm/vue");
 });
 
 test("decodes a Windows folder name from its drive letter", () => {
@@ -625,8 +551,7 @@ function templateDir({ template, css = "body{}", app = "run();" }) {
 }
 
 const TEMPLATE =
-  "<style>/*__STYLES__*/</style><script>/*__APP__*/</script>" +
-  "<script>const data = __DATA__;</script>";
+  "<style>/*__STYLES__*/</style><script>/*__APP__*/</script>" + "<script>const data = __DATA__;</script>";
 
 test("renderDashboard inlines styles, script and data", () => {
   const dir = templateDir({ template: TEMPLATE });
@@ -674,14 +599,8 @@ test("renderDashboard inlines the favicons from the real template", () => {
   const html = renderDashboard(data);
 
   assert.ok(!html.includes("__ICON_"));
-  assert.equal(
-    html.match(/<link rel="icon" [^>]*href="data:image\/png;base64,/g)?.length,
-    2,
-  );
-  assert.match(
-    html,
-    /<link rel="apple-touch-icon" sizes="180x180" href="data:image\/png;base64,/,
-  );
+  assert.equal(html.match(/<link rel="icon" [^>]*href="data:image\/png;base64,/g)?.length, 2);
+  assert.match(html, /<link rel="apple-touch-icon" sizes="180x180" href="data:image\/png;base64,/);
 });
 
 test("renderDashboard throws when a marker is missing or repeated", () => {
@@ -689,26 +608,16 @@ test("renderDashboard throws when a marker is missing or repeated", () => {
     template: "<style>/*__STYLES__*/</style><script>/*__APP__*/</script>",
   });
 
-  assert.throws(
-    () => renderDashboard({}, { dir: missing }),
-    /must contain __DATA__ exactly once/,
-  );
+  assert.throws(() => renderDashboard({}, { dir: missing }), /must contain __DATA__ exactly once/);
 
   const twice = templateDir({ template: `${TEMPLATE}__DATA__` });
-
-  assert.throws(
-    () => renderDashboard({}, { dir: twice }),
-    /must contain __DATA__ exactly once/,
-  );
+  assert.throws(() => renderDashboard({}, { dir: twice }), /must contain __DATA__ exactly once/);
 });
 
 test("summarizeDashboard prints total, sessions and date range", () => {
   const data = collectDashboard([source(events)], { now: NOW, decodeProject });
 
-  assert.equal(
-    summarizeDashboard(data),
-    "$9.55 across 2 sessions, Mar 10 to Mar 12",
-  );
+  assert.equal(summarizeDashboard(data), "$9.55 across 2 sessions, Mar 10 to Mar 12");
   assert.equal(
     summarizeDashboard({
       days: ["2025-12-30", "2026-01-02"],
@@ -727,9 +636,7 @@ test("summarizeDashboard prints total, sessions and date range", () => {
     "$5.00 across 1 session, Mar 10 to Mar 11",
   );
   assert.equal(
-    summarizeDashboard(
-      collectDashboard([source([])], { now: NOW, decodeProject }),
-    ),
+    summarizeDashboard(collectDashboard([source([])], { now: NOW, decodeProject })),
     "$0.00 across 0 sessions",
   );
 });
@@ -738,22 +645,9 @@ test("summarizeTokens totals each kind of token and the messages", () => {
   const data = collectDashboard([source(events)], { now: NOW, decodeProject });
 
   // input 0.1M + 1M + 0 + 1M, output 1M, cache read 2M, cache write 1M.
-  assert.equal(
-    summarizeTokens(data),
-    "2.1M input, 1M output, 2M cache read, 1M cache write, 4 messages",
-  );
-  assert.equal(
-    summarizeTokens({ facts: { ...data.facts, messages: [1] } }).endsWith(
-      "1 message",
-    ),
-    true,
-  );
-  assert.equal(
-    summarizeTokens(
-      collectDashboard([source([])], { now: NOW, decodeProject }),
-    ),
-    null,
-  );
+  assert.equal(summarizeTokens(data), "2.1M input, 1M output, 2M cache read, 1M cache write, 4 messages");
+  assert.equal(summarizeTokens({ facts: { ...data.facts, messages: [1] } }).endsWith("1 message"), true);
+  assert.equal(summarizeTokens(collectDashboard([source([])], { now: NOW, decodeProject })), null);
 });
 
 test("labels folders from deleted temp directories without the temp prefix", () => {
@@ -761,8 +655,7 @@ test("labels folders from deleted temp directories without the temp prefix", () 
     listDirs: () => [],
     home: "/Users/me",
   });
-  const mac =
-    "-private-var-folders--h-18swk2c916d1t9ycmjjg7cp80000gn-T-t3code-claude-title-IUQTwb";
+  const mac = "-private-var-folders--h-18swk2c916d1t9ycmjjg7cp80000gn-T-t3code-claude-title-IUQTwb";
 
   assert.equal(decode(mac).label, "t3code-claude-title-IUQTwb");
   assert.equal(decode(mac).folder, mac);

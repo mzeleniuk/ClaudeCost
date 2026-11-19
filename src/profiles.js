@@ -9,11 +9,7 @@ import { isPlainObject, readJsonObject } from "./validate.js";
 /** @import { Profile } from "./types.js" */
 
 /** Local profile list. Sits next to pricing.config.json and is not committed. */
-export const DEFAULT_PROFILES_PATH = path.join(
-  import.meta.dirname,
-  "..",
-  "profiles.config.json",
-);
+export const DEFAULT_PROFILES_PATH = path.join(import.meta.dirname, "..", "profiles.config.json");
 
 /**
  * True when `inner` is `outer` or a path below it. Both must be real paths.
@@ -73,50 +69,38 @@ function parseProfile(entry, index, filePath) {
   const name = typeof entry.name === "string" ? entry.name.trim() : "";
 
   if (!name) {
-    throw new Error(
-      `invalid profile at index ${index}: name must be a non-empty string`,
-    );
+    throw new Error(`invalid profile at index ${index}: name must be a non-empty string`);
   }
 
   if (typeof entry.dir !== "string" || entry.dir.trim() === "") {
-    throw new Error(
-      `invalid profile "${name}": dir must be a non-empty string`,
-    );
+    throw new Error(`invalid profile "${name}": dir must be a non-empty string`);
   }
 
   const configuredDir = entry.dir.trim();
   const dir = resolveUserPath(configuredDir, filePath);
 
   if (!fs.existsSync(dir)) {
-    throw new Error(
-      `profile "${name}" config directory not found: ${configuredDir}`,
-    );
+    throw new Error(`profile "${name}" config directory not found: ${configuredDir}`);
   }
 
   const projectsDir = path.join(dir, "projects");
 
   if (!fs.existsSync(projectsDir)) {
-    throw new Error(
-      `profile "${name}" transcript directory not found: ${projectsDir}`,
-    );
+    throw new Error(`profile "${name}" transcript directory not found: ${projectsDir}`);
   }
 
   let pricing = null;
 
   if (entry.pricing != null) {
     if (typeof entry.pricing !== "string" || entry.pricing.trim() === "") {
-      throw new Error(
-        `invalid profile "${name}": pricing must be a non-empty string`,
-      );
+      throw new Error(`invalid profile "${name}": pricing must be a non-empty string`);
     }
 
     const configuredPricing = entry.pricing.trim();
     pricing = resolveUserPath(configuredPricing, filePath);
 
     if (!fs.existsSync(pricing)) {
-      throw new Error(
-        `profile "${name}" pricing file not found: ${configuredPricing}`,
-      );
+      throw new Error(`profile "${name}" pricing file not found: ${configuredPricing}`);
     }
   }
 
@@ -147,15 +131,11 @@ export function loadProfiles(filePath = DEFAULT_PROFILES_PATH) {
   const { profiles } = readJsonObject(filePath, "profiles");
 
   if (!Array.isArray(profiles)) {
-    throw new Error(
-      `invalid profiles file (expected a profiles array): ${filePath}`,
-    );
+    throw new Error(`invalid profiles file (expected a profiles array): ${filePath}`);
   }
 
   if (profiles.length === 0) {
-    throw new Error(
-      `profiles file must list at least one profile: ${filePath}`,
-    );
+    throw new Error(`profiles file must list at least one profile: ${filePath}`);
   }
 
   /** @type {Profile[]} */

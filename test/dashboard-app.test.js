@@ -5,10 +5,7 @@ import vm from "node:vm";
 
 import { collectDashboard } from "../src/dashboard/collect.js";
 
-const app = fs.readFileSync(
-  new URL("../src/dashboard/app.js", import.meta.url),
-  "utf8",
-);
+const app = fs.readFileSync(new URL("../src/dashboard/app.js", import.meta.url), "utf8");
 
 // Position of the "// @test <name>" comment in app.js. Each one must appear
 // exactly once, otherwise a slice would silently cover the wrong code.
@@ -17,11 +14,7 @@ function marker(name) {
   const at = app.indexOf(comment);
 
   assert.notEqual(at, -1, `app.js has no "${comment}" comment`);
-  assert.equal(
-    app.indexOf(comment, at + 1),
-    -1,
-    `app.js has more than one "${comment}" comment`,
-  );
+  assert.equal(app.indexOf(comment, at + 1), -1, `app.js has more than one "${comment}" comment`);
 
   return at;
 }
@@ -49,10 +42,7 @@ function loadApp(data) {
   const context = vm.createContext({
     Intl,
     document: {
-      getElementById: (id) =>
-        id === "claude-cost-data"
-          ? { textContent: JSON.stringify(data) }
-          : host,
+      getElementById: (id) => (id === "claude-cost-data" ? { textContent: JSON.stringify(data) } : host),
       createElement: () => new Element(),
       createTextNode: (textContent) => ({ textContent }),
     },
@@ -137,16 +127,10 @@ for (const [range, n] of [
     assert.equal(app.evaluate("data.days[view.hi]"), "2026-03-13");
     assert.equal(app.evaluate("view.hi - view.lo + 1"), n);
     assert.equal(rows.find((row) => row.label === "spent").value, "$2.00");
-    assert.equal(
-      rows.find((row) => row.label === `vs previous ${range}`).sub,
-      "$1.00",
-    );
+    assert.equal(rows.find((row) => row.label === `vs previous ${range}`).sub, "$1.00");
 
     app.evaluate("state.range = 'all'");
-    assert.equal(
-      app.renderKpis().find((row) => row.label === "spent").value,
-      "$4.00",
-    );
+    assert.equal(app.renderKpis().find((row) => row.label === "spent").value, "$4.00");
   });
 }
 
@@ -159,10 +143,7 @@ test("dashboard recent ranges are empty when all usage is dated tomorrow", () =>
 
   for (const range of ["7d", "30d", "90d", "month"]) {
     app.evaluate(`state.range = '${range}'`);
-    assert.equal(
-      app.renderKpis().find((row) => row.label === "spent").value,
-      "$0.00",
-    );
+    assert.equal(app.renderKpis().find((row) => row.label === "spent").value, "$0.00");
     assert.equal(app.evaluate("view.hi < view.lo"), true);
   }
 });
@@ -185,18 +166,13 @@ test("dashboard month to date and its pace leave out tomorrow's usage", () => {
   assert.equal(app.evaluate("data.days[view.lo]"), "2026-03-01");
   assert.equal(app.evaluate("data.days[view.hi]"), "2026-03-13");
   assert.equal(rows.find((row) => row.label === "spent").value, "$2.00");
-  assert.equal(
-    rows.find((row) => row.label === "month-end pace").sub,
-    "month to date $2.00",
-  );
+  assert.equal(rows.find((row) => row.label === "month-end pace").sub, "month to date $2.00");
 });
 
 test("dashboard chart ticks and labels stay distinct for small spending amounts", () => {
   const { evaluate } = loadApp(dashboard());
 
-  for (const max of [
-    0.000001, 0.005, 0.01, 0.015, 0.02, 0.025, 0.04, 1, 1234,
-  ]) {
+  for (const max of [0.000001, 0.005, 0.01, 0.015, 0.02, 0.025, 0.04, 1, 1234]) {
     const { ticks, labels } = JSON.parse(
       evaluate(`JSON.stringify((() => {
       const { ticks, step } = niceTicks(${max});
@@ -232,10 +208,7 @@ test("dashboard keeps ids with the same parsed name apart", () => {
   data.models = ["claude-sonnet-4-5", "claude-sonnet-4-5@20250929"];
   const { evaluate } = loadApp(data);
 
-  assert.equal(
-    evaluate("modelInfo.map((m) => m.name).join('|')"),
-    "claude-sonnet-4-5|claude-sonnet-4-5@20250929",
-  );
+  assert.equal(evaluate("modelInfo.map((m) => m.name).join('|')"), "claude-sonnet-4-5|claude-sonnet-4-5@20250929");
   assert.notEqual(evaluate("modelColors[0]"), evaluate("modelColors[1]"));
 });
 
@@ -243,10 +216,7 @@ test("dashboard orders dotted model versions newest first and remaps facts", () 
   const data = dashboard();
   data.models = ["claude-opus-4.5", "claude-opus-5.5"];
   const { evaluate } = loadApp(data);
-  assert.equal(
-    evaluate("data.models.join(',')"),
-    "claude-opus-5.5,claude-opus-4.5",
-  );
+  assert.equal(evaluate("data.models.join(',')"), "claude-opus-5.5,claude-opus-4.5");
   assert.equal(evaluate("F.model[0]"), 1);
 });
 
@@ -330,26 +300,12 @@ test("dashboard shows nothing saved when there is no caching", () => {
 });
 
 test("the sample fixture matches the collected data shape and renders its KPIs", () => {
-  const fixture = JSON.parse(
-    fs.readFileSync(
-      new URL("fixtures/dashboard-data.json", import.meta.url),
-      "utf8",
-    ),
-  );
+  const fixture = JSON.parse(fs.readFileSync(new URL("fixtures/dashboard-data.json", import.meta.url), "utf8"));
   const collected = dashboard();
   assert.deepEqual(Object.keys(fixture).sort(), Object.keys(collected).sort());
-  assert.deepEqual(
-    Object.keys(fixture.facts).sort(),
-    Object.keys(collected.facts).sort(),
-  );
-  assert.deepEqual(
-    Object.keys(fixture.sessions).sort(),
-    Object.keys(collected.sessions).sort(),
-  );
-  assert.deepEqual(
-    Object.keys(fixture.warnings).sort(),
-    Object.keys(collected.warnings).sort(),
-  );
+  assert.deepEqual(Object.keys(fixture.facts).sort(), Object.keys(collected.facts).sort());
+  assert.deepEqual(Object.keys(fixture.sessions).sort(), Object.keys(collected.sessions).sort());
+  assert.deepEqual(Object.keys(fixture.warnings).sort(), Object.keys(collected.warnings).sort());
 
   const rows = loadApp(fixture).renderKpis();
   const total = fixture.facts.cost.reduce((sum, cost) => sum + cost, 0);
@@ -357,12 +313,8 @@ test("the sample fixture matches the collected data shape and renders its KPIs",
     style: "currency",
     currency: "USD",
   });
-  assert.equal(
-    rows.find((row) => row.label === "spent").value,
-    usd.format(total),
-  );
-  for (const row of rows)
-    assert.doesNotMatch(`${row.value} ${row.sub}`, /NaN|undefined/, row.label);
+  assert.equal(rows.find((row) => row.label === "spent").value, usd.format(total));
+  for (const row of rows) assert.doesNotMatch(`${row.value} ${row.sub}`, /NaN|undefined/, row.label);
 });
 
 test("dashboard checks the capture cutoff in the data timezone, including sub-minute cutoffs", () => {
@@ -410,8 +362,8 @@ for (const { range, days, midnightOffset } of [
     data.sessions.lastDay = [days - 1];
 
     const midnight = new Date(`${data.days[0]}T${midnightOffset}:00.000Z`);
-    const label =
-      range === "month" ? "vs previous month" : `vs previous ${range}`;
+    const label = range === "month" ? "vs previous month" : `vs previous ${range}`;
+
     for (const [since, comparable] of [
       [null, true],
       [new Date(midnight.getTime() - 1).toISOString(), true],
@@ -429,8 +381,7 @@ for (const { range, days, midnightOffset } of [
         String(since),
       );
       assert.equal(rows.find((row) => row.label === "spent").value, "$10.00");
-      if (comparable)
-        assert.equal(rows.find((row) => row.label === label).sub, "$1.00");
+      if (comparable) assert.equal(rows.find((row) => row.label === label).sub, "$1.00");
     }
   });
 }

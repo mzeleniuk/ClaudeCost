@@ -6,19 +6,12 @@ import { fmtTokens, fmtUSD } from "../src/report/format.js";
 import { renderJson } from "../src/report/json.js";
 import { renderMonthlyTable } from "../src/report/monthlyTable.js";
 import { renderProfileReports } from "../src/report/profiles.js";
-import {
-  RECONCILE_NOTE,
-  renderTable,
-  warningLines,
-} from "../src/report/table.js";
+import { RECONCILE_NOTE, renderTable, warningLines } from "../src/report/table.js";
 
 test("unknown-model warning names the pricing file in use", () => {
   const result = { unknownModels: ["claude-opus-9"], notInRegion: [] };
 
-  assert.match(
-    warningLines(result).join("\n"),
-    /Add them to pricing\.config\.json/,
-  );
+  assert.match(warningLines(result).join("\n"), /Add them to pricing\.config\.json/);
   assert.match(
     warningLines(result, { pricingFile: "./pricing.work.json" }).join("\n"),
     /Add them to \.\/pricing\.work\.json/,
@@ -26,11 +19,7 @@ test("unknown-model warning names the pricing file in use", () => {
 });
 
 test("not-in-region warning names the endpoint", () => {
-  const lines = warningLines(
-    { unknownModels: [], notInRegion: ["claude-opus-5-5"] },
-    { region: "us-east5" },
-  );
-
+  const lines = warningLines({ unknownModels: [], notInRegion: ["claude-opus-5-5"] }, { region: "us-east5" });
   const text = stripVTControlCharacters(lines.join("\n"));
 
   assert.match(text, /Not offered at the us-east5 endpoint/);
@@ -74,12 +63,7 @@ test("renderTable returns the totals table and footer", () => {
 });
 
 test("renderTable says when there is no activity", () => {
-  const text = plain(
-    renderTable(
-      { ...summary(totals(0, 0, 0)), groups: new Map() },
-      { byModel: true, since: null },
-    ),
-  );
+  const text = plain(renderTable({ ...summary(totals(0, 0, 0)), groups: new Map() }, { byModel: true, since: null }));
 
   assert.match(text, /^ {2}⎿ {2}All history$/m);
   assert.match(text, /No activity in this period\./);
@@ -137,10 +121,7 @@ test("renderMonthlyTable prints months in order with their totals", () => {
   assert.ok(text.indexOf("January 2025") < text.indexOf("February 2025"));
   assert.match(text, /^ {5}January 2025 +input +output/m);
   assert.match(text, /^ {5}total .* 1 +\$1\.00$/m);
-  assert.match(
-    text,
-    /^ {2}⎿ {2}All history, region eu \(\+10% over global\)$/m,
-  );
+  assert.match(text, /^ {2}⎿ {2}All history, region eu \(\+10% over global\)$/m);
   assert.match(text, /^ {5}All months {2}\$3\.00 {2}2 messages$/m);
   assert.match(text, /^ {5}Skipped 4 message\(s\) without a timestamp/m);
 });
@@ -151,9 +132,7 @@ test("renderJson rounds costs and adds byModel only when grouped", () => {
     groups: new Map([["claude-opus-5-5", totals(1, 0.123_456_789)]]),
   };
   const flat = JSON.parse(renderJson(result, { byModel: false, since: null }));
-  const grouped = JSON.parse(
-    renderJson(result, { byModel: true, since: null, region: "us" }),
-  );
+  const grouped = JSON.parse(renderJson(result, { byModel: true, since: null, region: "us" }));
 
   assert.equal(flat.groupedBy, "none");
   assert.equal(flat.total.costUSD, 0.123457);
@@ -181,9 +160,8 @@ test("renderProfileReports adds an all-profiles total", () => {
   assert.match(text, /^ {5}total +2 +\$3\.00$/m);
   assert.equal(text.split(RECONCILE_NOTE).length, 2, "note printed once");
 
-  const json = JSON.parse(
-    renderProfileReports(reports, { ...opts, json: true }),
-  );
+  const json = JSON.parse(renderProfileReports(reports, { ...opts, json: true }));
+
   assert.deepEqual(
     json.profiles.map((p) => [p.name, p.dir]),
     [

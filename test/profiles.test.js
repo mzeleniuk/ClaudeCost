@@ -15,20 +15,14 @@ function writeProfiles(dir, body) {
 }
 
 test("loadProfiles returns null when the file is missing", () => {
-  const missing = path.join(
-    os.tmpdir(),
-    `claude-cost-missing-profiles-${process.pid}.json`,
-  );
+  const missing = path.join(os.tmpdir(), `claude-cost-missing-profiles-${process.pid}.json`);
   assert.equal(loadProfiles(missing), null);
 });
 
 test("loadProfiles expands ~ in dir", () => {
   const home = os.homedir();
 
-  assert.ok(
-    fixture.startsWith(`${home}${path.sep}`),
-    "profile fixture must live under the home directory",
-  );
+  assert.ok(fixture.startsWith(`${home}${path.sep}`), "profile fixture must live under the home directory");
 
   const configured = `~/${path.relative(home, fixture)}`;
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-profiles-"));
@@ -64,10 +58,7 @@ test("loadProfiles rejects a missing config directory", () => {
     profiles: [{ name: "work", dir: path.join(root, "missing-config") }],
   });
 
-  assert.throws(
-    () => loadProfiles(file),
-    /profile "work" config directory not found/,
-  );
+  assert.throws(() => loadProfiles(file), /profile "work" config directory not found/);
 });
 
 test("loadProfiles rejects a config directory without projects", () => {
@@ -78,10 +69,7 @@ test("loadProfiles rejects a config directory without projects", () => {
     profiles: [{ name: "work", dir: configDir }],
   });
 
-  assert.throws(
-    () => loadProfiles(file),
-    /profile "work" transcript directory not found/,
-  );
+  assert.throws(() => loadProfiles(file), /profile "work" transcript directory not found/);
 });
 
 test("loadProfiles resolves an optional pricing path", () => {
@@ -91,9 +79,7 @@ test("loadProfiles resolves an optional pricing path", () => {
   const pricing = path.join(root, "pricing.work.json");
   fs.writeFileSync(pricing, "{}");
   const file = writeProfiles(root, {
-    profiles: [
-      { name: "work", dir: configDir, pricing: "./pricing.work.json" },
-    ],
+    profiles: [{ name: "work", dir: configDir, pricing: "./pricing.work.json" }],
   });
 
   const profiles = loadProfiles(file);
@@ -118,10 +104,8 @@ test("loadProfiles reads an optional region and rejects unknown ones", () => {
   writeProfiles(root, {
     profiles: [{ name: "work", dir: fixture, region: "mars" }],
   });
-  assert.throws(
-    () => loadProfiles(file),
-    /unknown region "mars" in profile "work"/,
-  );
+
+  assert.throws(() => loadProfiles(file), /unknown region "mars" in profile "work"/);
 });
 
 function makeConfigDir(...parts) {
@@ -179,10 +163,7 @@ test("loadProfiles rejects profiles linked to the same transcripts", () => {
     ],
   });
 
-  assert.throws(
-    () => loadProfiles(file),
-    /reads the same transcript directory/,
-  );
+  assert.throws(() => loadProfiles(file), /reads the same transcript directory/);
 });
 
 test("loadProfiles accepts sibling directories with a shared name prefix", () => {

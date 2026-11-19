@@ -1,8 +1,8 @@
 {
   "name": "claude-cost",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "private": true,
-  "description": "Approximate local cost tracking for Claude Code (Vertex AI) by parsing session transcripts.",
+  "description": "Approximate local cost tracking for Claude Code by parsing session transcripts.",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -24,6 +24,7 @@
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "history": "node bin/claude-cost.js --by-month",
+    "hooks:install": "git config core.hooksPath .githooks",
     "lint": "for f in bin/*.js src/*.js src/dashboard/*.js src/report/*.js; do node --check \"$f\"; done",
     "monthly": "node bin/claude-cost.js --monthly --by-model",
     "start": "node bin/claude-cost.js",

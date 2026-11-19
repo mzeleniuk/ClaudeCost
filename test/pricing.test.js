@@ -5,12 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-  priceForModel,
-  computeCost,
-  costBreakdown,
-  loadPricing,
-} from "../src/pricing.js";
+import { priceForModel, computeCost, costBreakdown, loadPricing } from "../src/pricing.js";
 
 const PRICING = {
   "claude-sonnet-4": {
@@ -60,10 +55,7 @@ test("costBreakdown splits the cost by kind of token", () => {
 
   assert.equal(parts.input, 3);
   assert.equal(parts.output, 15);
-  assert.equal(
-    parts.input + parts.output + parts.cacheWrite + parts.cacheRead,
-    computeCost(p, usage),
-  );
+  assert.equal(parts.input + parts.output + parts.cacheWrite + parts.cacheRead, computeCost(p, usage));
 });
 
 test("costBreakdown uses the cache write rate of each TTL and the long-context tier", () => {
@@ -108,14 +100,8 @@ test("prices hyphenated sonnet 5.5 separately from sonnet 5", () => {
   assert.equal(sonnet55.cacheWrite, 2.5);
   assert.equal(sonnet55.cacheWrite1h, 4);
   assert.equal(sonnet55.cacheRead, 0.1);
-  assert.equal(
-    priceForModel(pricing, "claude-sonnet-5.5@20260928"),
-    pricing["claude-sonnet-5-5"],
-  );
-  assert.equal(
-    priceForModel(pricing, "claude-sonnet-5@20260630"),
-    pricing["claude-sonnet-5"],
-  );
+  assert.equal(priceForModel(pricing, "claude-sonnet-5.5@20260928"), pricing["claude-sonnet-5-5"]);
+  assert.equal(priceForModel(pricing, "claude-sonnet-5@20260630"), pricing["claude-sonnet-5"]);
 });
 
 test("prices hyphenated haiku 5.5 separately from haiku 4.5", () => {
@@ -128,10 +114,7 @@ test("prices hyphenated haiku 5.5 separately from haiku 4.5", () => {
   assert.equal(haiku55.cacheWrite, 0.125);
   assert.equal(haiku55.cacheWrite1h, 0.2);
   assert.equal(haiku55.cacheRead, 0.01);
-  assert.equal(
-    priceForModel(pricing, "claude-haiku-5.5@20261007"),
-    pricing["claude-haiku-5-5"],
-  );
+  assert.equal(priceForModel(pricing, "claude-haiku-5.5@20261007"), pricing["claude-haiku-5-5"]);
   assert.equal(priceForModel(pricing, "claude-haiku-4-5@20251015").input, 1);
 });
 
@@ -171,10 +154,7 @@ test("prefers longest matching key regardless of key order", () => {
 
 test("loadPricing rejects invalid price fields", () => {
   const invalid = new URL("./fixtures/invalid-pricing.json", import.meta.url);
-  assert.throws(
-    () => loadPricing(fileURLToPath(invalid)),
-    /"output" must be a number/,
-  );
+  assert.throws(() => loadPricing(fileURLToPath(invalid)), /"output" must be a number/);
 });
 
 test("flat cache write uses cacheWrite rate", () => {
@@ -209,19 +189,10 @@ test("does not price an unlisted version as an older key", () => {
   const pricing = loadPricing();
 
   assert.equal(priceForModel(pricing, "claude-opus-4-9")._unknown, true);
-  assert.equal(
-    priceForModel(pricing, "claude-sonnet-5-6@20261001")._unknown,
-    true,
-  );
+  assert.equal(priceForModel(pricing, "claude-sonnet-5-6@20261001")._unknown, true);
   assert.equal(priceForModel(pricing, "claude-opus-4-10")._unknown, true);
-  assert.equal(
-    priceForModel(pricing, "claude-opus-4-1@20250805")._unknown,
-    true,
-  );
-  assert.equal(
-    priceForModel(pricing, "claude-3-7-sonnet@20250219")._unknown,
-    true,
-  );
+  assert.equal(priceForModel(pricing, "claude-opus-4-1@20250805")._unknown, true);
+  assert.equal(priceForModel(pricing, "claude-3-7-sonnet@20250219")._unknown, true);
 });
 
 test("matches dated, Bedrock and context-suffixed model IDs", () => {
@@ -300,10 +271,7 @@ test("loadPricing rejects an invalid longContext threshold", () => {
   };
 
   try {
-    fs.writeFileSync(
-      file,
-      JSON.stringify({ m: { ...rates, longContext: { ...rates } } }),
-    );
+    fs.writeFileSync(file, JSON.stringify({ m: { ...rates, longContext: { ...rates } } }));
     assert.throws(() => loadPricing(file), /"threshold" must be a positive/);
 
     fs.writeFileSync(
@@ -312,10 +280,7 @@ test("loadPricing rejects an invalid longContext threshold", () => {
         m: { ...rates, longContext: { threshold: 1000, input: 1 } },
       }),
     );
-    assert.throws(
-      () => loadPricing(file),
-      /longContext.*"output" must be a number/,
-    );
+    assert.throws(() => loadPricing(file), /longContext.*"output" must be a number/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -327,15 +292,9 @@ test("loadPricing names the file when it is not valid JSON", () => {
 
   try {
     fs.writeFileSync(file, "{ nope");
-    assert.throws(
-      () => loadPricing(file),
-      /invalid pricing file \(expected JSON\): .*pricing\.json/,
-    );
+    assert.throws(() => loadPricing(file), /invalid pricing file \(expected JSON\): .*pricing\.json/);
     fs.writeFileSync(file, "[]");
-    assert.throws(
-      () => loadPricing(file),
-      /invalid pricing file \(expected object\)/,
-    );
+    assert.throws(() => loadPricing(file), /invalid pricing file \(expected object\)/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

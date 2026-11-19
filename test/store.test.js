@@ -7,12 +7,7 @@ import path from "node:path";
 import { aggregate } from "../src/aggregate.js";
 import { dedupeEvents } from "../src/dedupe.js";
 import { eventsFromRecord } from "../src/parse.js";
-import {
-  STORE_VERSION,
-  compactRecords,
-  readStoredEvents,
-  storeFileName,
-} from "../src/store.js";
+import { STORE_VERSION, compactRecords, readStoredEvents, storeFileName } from "../src/store.js";
 
 /**
  * A transcript directory, a store directory, and helpers to read through the
@@ -31,8 +26,7 @@ function setup() {
       warn: (message) => warnings.push(message),
       ...opts,
     });
-  const storeFile = () =>
-    path.join(storeDir, storeFileName(fs.realpathSync.native(projects)));
+  const storeFile = () => path.join(storeDir, storeFileName(fs.realpathSync.native(projects)));
   const readStore = () => JSON.parse(fs.readFileSync(storeFile(), "utf8"));
   const transcript = (name) => path.join(projects, "proj", name);
 
@@ -61,8 +55,7 @@ const line = (id, input) =>
   });
 
 /** @param {{ messageId: string | null, usage: { input: number } }[]} events */
-const summary = (events) =>
-  events.map((event) => [event.messageId, event.usage.input]);
+const summary = (events) => events.map((event) => [event.messageId, event.usage.input]);
 
 test("storeFileName is a readable slug plus a hash of the path", () => {
   const name = storeFileName(path.join(os.homedir(), ".claude", "projects"));
@@ -184,10 +177,7 @@ test("keeps usage from deleted transcripts, also through a rebuild", async (t) =
     events.some((event) => event.archived),
     false,
   );
-  assert.equal(
-    s.readStore().files[path.join("proj", "gone.jsonl")].deletedAt,
-    undefined,
-  );
+  assert.equal(s.readStore().files[path.join("proj", "gone.jsonl")].deletedAt, undefined);
 });
 
 test("archived and live copies of a message are deduped and counted", async (t) => {
@@ -283,9 +273,11 @@ const record = (id, ts, usage) => ({
 
 /** @param {ReturnType<typeof record>[]} records */
 const priced = async (records) =>
-  (await dedupeEvents(records.flatMap((r) => eventsFromRecord(r, "f")))).map(
-    (event) => [event.messageId, event.ts?.toISOString(), event.usage],
-  );
+  (await dedupeEvents(records.flatMap((r) => eventsFromRecord(r, "f")))).map((event) => [
+    event.messageId,
+    event.ts?.toISOString(),
+    event.usage,
+  ]);
 
 test("compactRecords drops empty usage fields but keeps iteration indexes", () => {
   const [compact] = compactRecords([
