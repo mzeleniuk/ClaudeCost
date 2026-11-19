@@ -240,33 +240,60 @@ export function promptTokens(usage = {}) {
 }
 
 /**
- * Compute USD cost for a single normalized usage record.
+ * Charge for each kind of token, in USD per million tokens times tokens.
  * When the price has a longContext tier and the prompt is over its threshold,
  * every token in the request is billed at the long-context rates.
  *
  * @param {Price} price
- * @param {Partial<Usage>} [usage]
+ * @param {Partial<Usage>} usage
  */
-export function computeCost(price, usage = {}) {
+function chargeByKind(price, usage) {
   const rates =
     price.longContext && promptTokens(usage) > price.longContext.threshold
       ? price.longContext
       : price;
 
-  const input = usage.input ?? 0;
-  const output = usage.output ?? 0;
-  const cacheRead = usage.cacheRead ?? 0;
-
-  const cacheCost = usage.hasCacheBreakdown
+  const cacheWrite = usage.hasCacheBreakdown
     ? (usage.cacheWrite5m ?? 0) * rates.cacheWrite +
       (usage.cacheWrite1h ?? 0) * rates.cacheWrite1h
     : (usage.cacheWrite ?? 0) * rates.cacheWrite;
 
+  return {
+    input: (usage.input ?? 0) * rates.input,
+    output: (usage.output ?? 0) * rates.output,
+    cacheWrite,
+    cacheRead: (usage.cacheRead ?? 0) * rates.cacheRead,
+  };
+}
+
+/**
+ * Compute USD cost for a single normalized usage record.
+ *
+ * @param {Price} price
+ * @param {Partial<Usage>} [usage]
+ */
+export function computeCost(price, usage = {}) {
+  const charge = chargeByKind(price, usage);
+
   return (
-    (input * rates.input +
-      output * rates.output +
-      cacheCost +
-      cacheRead * rates.cacheRead) /
+    (charge.input + charge.output + charge.cacheWrite + charge.cacheRead) /
     PER_MILLION
   );
+}
+
+/**
+ * The same cost as computeCost, split by kind of token.
+ *
+ * @param {Price} price
+ * @param {Partial<Usage>} [usage]
+ */
+export function costBreakdown(price, usage = {}) {
+  const charge = chargeByKind(price, usage);
+
+  return {
+    input: charge.input / PER_MILLION,
+    output: charge.output / PER_MILLION,
+    cacheWrite: charge.cacheWrite / PER_MILLION,
+    cacheRead: charge.cacheRead / PER_MILLION,
+  };
 }

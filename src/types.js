@@ -143,4 +143,79 @@
  * @property {boolean} [showNote] Print the reconciliation note. Default true.
  */
 
+/**
+ * Usage summed per local day, hour, profile, model, project and agent kind,
+ * stored as parallel arrays of equal length. `day` indexes
+ * `DashboardData.days`, and `profile`, `model` and `project` index the
+ * matching lists. `subagent` is 1 for subagent transcripts. `cost` is the
+ * priced USD cost, and the four `cost*` columns after it split that cost by
+ * kind of token. `uncachedCost` prices the same messages with every cache
+ * read and write billed as plain input, so the difference is what caching
+ * saved after the cache-write premium.
+ *
+ * @typedef {object} DashboardFacts
+ * @property {number[]} day
+ * @property {number[]} hour 0-23, local time.
+ * @property {number[]} profile
+ * @property {number[]} model
+ * @property {number[]} project
+ * @property {number[]} subagent
+ * @property {number[]} input
+ * @property {number[]} output
+ * @property {number[]} cacheWrite
+ * @property {number[]} cacheRead
+ * @property {number[]} cost
+ * @property {number[]} costInput Part of `cost` for input tokens.
+ * @property {number[]} costOutput Part of `cost` for output tokens.
+ * @property {number[]} costCacheWrite Part of `cost` for cache writes.
+ * @property {number[]} costCacheRead Part of `cost` for cache reads.
+ * @property {number[]} uncachedCost
+ * @property {number[]} messages
+ */
+
+/**
+ * One row per session, as parallel arrays. A session is a top-level
+ * transcript plus its subagent transcripts. `firstDay` and `lastDay` index
+ * `DashboardData.days`.
+ *
+ * @typedef {object} DashboardSessions
+ * @property {number[]} profile
+ * @property {number[]} project
+ * @property {number[]} firstDay
+ * @property {number[]} lastDay
+ */
+
+/**
+ * @typedef {object} DashboardProject
+ * @property {string} label Short name, usually the last path segment.
+ * @property {string} folder Folder name under `projects`.
+ * @property {string | null} path Working directory decoded from `folder`,
+ *   or null when no existing directory matches.
+ */
+
+/**
+ * Everything the HTML dashboard reads. Built by collectDashboard and
+ * embedded in the page as JSON.
+ *
+ * @typedef {object} DashboardData
+ * @property {1} version
+ * @property {string} generatedAt ISO time.
+ * @property {string} timezone IANA zone used for `days` and `hour`.
+ * @property {string | null} since ISO lower bound, or null for all history.
+ * @property {string[]} days Every local "YYYY-MM-DD" from the first active
+ *   day to the day of `generatedAt`, ascending, including days without
+ *   usage. Empty when there is no usage.
+ * @property {{ name: string, region: string, pricingFile: string }[]} profiles
+ * @property {string[]} models
+ * @property {DashboardProject[]} projects
+ * @property {DashboardFacts} facts
+ * @property {DashboardSessions} sessions
+ * @property {{
+ *   unknownModels: string[],
+ *   notInRegion: string[],
+ *   archivedTranscripts: number,
+ *   skippedUndated: number,
+ * }} warnings
+ */
+
 export {};

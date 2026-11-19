@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  dayKey,
   formatLocalDateTime,
   monthKey,
   parseSince,
@@ -111,4 +112,11 @@ test("monthKey returns null for invalid dates", () => {
   assert.equal(monthKey(null), null);
   assert.equal(monthKey(undefined), null);
   assert.equal(monthKey(new Date("invalid")), null);
+});
+
+test("dayKey is the local date and null for a missing or invalid date", () => {
+  assert.equal(dayKey(new Date(2026, 6, 1, 23, 59)), "2026-07-01");
+  assert.equal(dayKey(new Date(2026, 11, 9, 0, 0)), "2026-12-09");
+  assert.equal(dayKey(null), null);
+  assert.equal(dayKey(new Date("nope")), null);
 });

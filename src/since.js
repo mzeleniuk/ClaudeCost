@@ -32,6 +32,16 @@ export function monthKey(date) {
 }
 
 /**
+ * "YYYY-MM-DD" in local timezone; returns null if date is invalid.
+ *
+ * @param {Date | null | undefined} date
+ */
+export function dayKey(date) {
+  if (!date || Number.isNaN(date.getTime())) return null;
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+/**
  * First day of the current month at local midnight (inclusive lower bound).
  *
  * @param {Date} [now]

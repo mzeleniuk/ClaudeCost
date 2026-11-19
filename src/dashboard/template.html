@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>Claude·Cost</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="__ICON_32__" />
+    <link rel="icon" type="image/png" sizes="16x16" href="__ICON_16__" />
+    <link rel="apple-touch-icon" sizes="180x180" href="__ICON_180__" />
+
+    <script>
+      // Resolve the theme before first paint: ?theme= or #theme= first, then the
+      // saved choice, then the system setting.
+      (function () {
+        var theme = null;
+
+        try {
+          var q =
+            new URLSearchParams(location.search).get("theme") ||
+            new URLSearchParams(location.hash.slice(1)).get("theme");
+
+          if (q === "light" || q === "dark") {
+            theme = q;
+          } else {
+            theme = localStorage.getItem("claude-cost-theme");
+          }
+        } catch (e) {}
+        if (theme !== "light" && theme !== "dark") {
+          theme = matchMedia("(prefers-color-scheme: light)").matches
+            ? "light"
+            : "dark";
+        }
+
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+    <style>
+      /*__STYLES__*/
+    </style>
+  </head>
+
+  <body>
+    <header class="top">
+      <a class="wordmark" href="#" aria-label="claude cost">
+        <span>
+          Claude<span class="mark-dot">·</span
+          ><span class="mark-cost">Cost</span>
+        </span>
+      </a>
+
+      <nav class="nav" aria-label="filters">
+        <div class="tabs" id="range-tabs" role="group" aria-label="range"></div>
+        <span class="tabs-sep" id="profile-sep" hidden></span>
+
+        <div
+          class="tabs"
+          id="profile-tabs"
+          role="group"
+          aria-label="profile"
+          hidden
+        ></div>
+      </nav>
+
+      <div class="actions">
+        <button
+          class="text-btn filters-btn"
+          id="filters-open"
+          type="button"
+          aria-controls="sidebar"
+        >
+          Filters
+        </button>
+
+        <button
+          class="icon-btn"
+          id="theme-toggle"
+          type="button"
+          aria-label="Switch theme"
+          title="Switch theme"
+        ></button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <main class="feed" id="feed">
+        <section class="sec sec-kpis" aria-label="summary">
+          <div class="kpis" id="kpis"></div>
+        </section>
+
+        <section class="sec" aria-labelledby="h-daily">
+          <div class="sec-head">
+            <h2 id="h-daily">Daily spend</h2>
+            <span class="caption" id="cap-daily"></span>
+          </div>
+
+          <div class="legend" id="legend-daily"></div>
+          <div class="chart" id="chart-daily"></div>
+        </section>
+
+        <section class="sec" aria-labelledby="h-monthly">
+          <div class="sec-head">
+            <h2 id="h-monthly">Month by month</h2>
+            <span class="caption" id="cap-monthly"></span>
+          </div>
+
+          <div class="chart" id="chart-monthly"></div>
+        </section>
+
+        <section class="sec" aria-label="models and projects">
+          <div class="two-col">
+            <div>
+              <div class="sec-head">
+                <h2>Models</h2>
+                <span class="caption" id="cap-models"></span>
+              </div>
+
+              <ol class="ranking" id="rank-models"></ol>
+            </div>
+
+            <div>
+              <div class="sec-head">
+                <h2>Projects</h2>
+                <span class="caption" id="cap-projects"></span>
+              </div>
+
+              <ol class="ranking" id="rank-projects"></ol>
+            </div>
+          </div>
+        </section>
+
+        <section class="sec" aria-labelledby="h-when">
+          <div class="sec-head">
+            <h2 id="h-when">When you spend</h2>
+            <span class="caption" id="cap-when"></span>
+          </div>
+
+          <div class="heat-grid">
+            <div class="heat-panel">
+              <div class="panel-label">By day</div>
+              <div class="chart heat-host" id="heat-days"></div>
+            </div>
+
+            <div class="heat-panel">
+              <div class="panel-label">By hour and weekday</div>
+              <div class="chart heat-host" id="heat-hours"></div>
+            </div>
+          </div>
+
+          <div class="heat-legend" id="heat-legend"></div>
+        </section>
+
+        <section class="sec" aria-labelledby="h-tokens">
+          <div class="sec-head">
+            <h2 id="h-tokens">Tokens versus dollars</h2>
+            <span class="caption" id="cap-tokens"></span>
+          </div>
+
+          <div id="tokens"></div>
+        </section>
+
+        <section class="sec" aria-labelledby="h-agents">
+          <div class="sec-head">
+            <h2 id="h-agents">Main agent versus subagents</h2>
+            <span class="caption" id="cap-agents"></span>
+          </div>
+
+          <div class="legend" id="legend-agents"></div>
+          <div class="chart" id="chart-agents"></div>
+        </section>
+      </main>
+
+      <aside class="side" id="sidebar" aria-label="filters">
+        <div class="side-top">
+          <span>Filters</span>
+          <button class="text-btn" id="filters-close" type="button">
+            Close
+          </button>
+        </div>
+
+        <div class="group">
+          <div class="group-head">
+            <span>Models</span>
+            <span class="group-meta">
+              <button
+                class="text-btn reset"
+                id="reset-models"
+                type="button"
+                hidden
+              >
+                Reset
+              </button>
+              <span id="count-models"> </span>
+            </span>
+          </div>
+
+          <div id="side-models"></div>
+        </div>
+        <div class="group">
+          <div class="group-head">
+            <span>Projects</span>
+            <span class="group-meta">
+              <button
+                class="text-btn reset"
+                id="reset-projects"
+                type="button"
+                hidden
+              >
+                Reset
+              </button>
+              <span id="count-projects"></span>
+            </span>
+          </div>
+
+          <div id="side-projects"></div>
+        </div>
+      </aside>
+    </div>
+
+    <footer class="foot" id="foot"></footer>
+    <div class="tooltip" id="tooltip" role="status" hidden></div>
+
+    <script type="application/json" id="claude-cost-data">
+      __DATA__
+    </script>
+
+    <script type="module">
+      /*__APP__*/
+    </script>
+  </body>
+</html>

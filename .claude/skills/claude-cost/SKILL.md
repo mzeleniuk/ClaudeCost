@@ -22,8 +22,11 @@ Pick flags from the question:
 | Since a date                  | `--since 2026-10-15`        |
 | Last month, or month by month | `--by-month`                |
 | All time                      | no flags                    |
+| A chart, a visual overview    | `--dashboard`               |
 
 There is no end-date flag. For "last month", run `--by-month` and read that month's rows. `--by-month` already splits each month by model, and the CLI rejects it combined with `--by-model`.
+
+`--dashboard` writes an HTML page with charts instead of printing a table, and prints a `file://` link to it. It does not open a browser, so give the user that link to open. Use it only when the user wants to see a chart. It cannot be combined with the other report flags, and its numbers are not readable as text, so answer questions from the table or `--json`. The page lists project names and what each cost, so do not paste its contents anywhere.
 
 Add `--json` when you need to compare or add up numbers yourself. Otherwise the table is short enough to show as is.
 

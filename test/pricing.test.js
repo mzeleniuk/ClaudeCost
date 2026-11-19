@@ -5,7 +5,12 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { priceForModel, computeCost, loadPricing } from "../src/pricing.js";
+import {
+  priceForModel,
+  computeCost,
+  costBreakdown,
+  loadPricing,
+} from "../src/pricing.js";
 
 const PRICING = {
   "claude-sonnet-4": {
@@ -40,6 +45,57 @@ test("computes cost correctly", () => {
   });
 
   assert.equal(cost, 18.0); // 3 + 15
+});
+
+test("costBreakdown splits the cost by kind of token", () => {
+  const p = priceForModel(PRICING, "claude-sonnet-4");
+  const usage = {
+    cacheRead: 2_000_000,
+    cacheWrite: 1_000_000,
+    hasCacheBreakdown: false,
+    input: 1_000_000,
+    output: 1_000_000,
+  };
+  const parts = costBreakdown(p, usage);
+
+  assert.equal(parts.input, 3);
+  assert.equal(parts.output, 15);
+  assert.equal(
+    parts.input + parts.output + parts.cacheWrite + parts.cacheRead,
+    computeCost(p, usage),
+  );
+});
+
+test("costBreakdown uses the cache write rate of each TTL and the long-context tier", () => {
+  const price = {
+    input: 1,
+    output: 2,
+    cacheWrite: 3,
+    cacheWrite1h: 4,
+    cacheRead: 0.5,
+    longContext: {
+      threshold: 1_000_000,
+      input: 10,
+      output: 20,
+      cacheWrite: 30,
+      cacheWrite1h: 40,
+      cacheRead: 5,
+    },
+  };
+  const usage = {
+    cacheRead: 0,
+    cacheWrite: 2_000_000,
+    cacheWrite1h: 1_000_000,
+    cacheWrite5m: 1_000_000,
+    hasCacheBreakdown: true,
+    input: 0,
+    output: 0,
+  };
+  const parts = costBreakdown(price, usage);
+
+  // The prompt is over the threshold, so every token uses the long rates.
+  assert.equal(parts.cacheWrite, 70);
+  assert.equal(parts.cacheWrite, computeCost(price, usage));
 });
 
 test("prices hyphenated sonnet 5.5 separately from sonnet 5", () => {

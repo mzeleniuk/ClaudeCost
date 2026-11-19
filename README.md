@@ -35,18 +35,50 @@ claude-cost --help
 
 ```bash
 claude-cost                         # all-time total
-claude-cost --since 7d              # last 7 days
-claude-cost --since today           # since local midnight
-claude-cost --since 2025-01-01      # since local midnight on a date
-claude-cost --since 2025-01-15T10:00  # since a local date and time
-claude-cost --monthly               # since start of current month
-claude-cost --by-month              # per-month, per-model history (all time)
 claude-cost --by-model              # per-model breakdown
-claude-cost --json                  # machine-readable output
+claude-cost --by-month              # per-month, per-model history (all time)
+claude-cost --dashboard             # write data/dashboard.html, print its link
 claude-cost --dir ~/.claude/projects
+claude-cost --json                  # machine-readable output
+claude-cost --monthly               # since start of current month
 claude-cost --pricing ./my-prices.json
 claude-cost --region us             # price at the US multi-region endpoint
+claude-cost --since 2025-01-01      # since local midnight on a date
+claude-cost --since 2025-01-15T10:00  # since a local date and time
+claude-cost --since 7d              # last 7 days
+claude-cost --since today           # since local midnight
 ```
+
+## Dashboard
+
+`--dashboard` writes one HTML file with your spend over time. It has daily and monthly cost charts stacked by model, rankings of models and projects, a calendar and an hour-by-weekday map of when you spend, a token mix next to the cost mix, and main agent against subagent spend. The dollar figure for what prompt caching saved comes from pricing the same messages with every cache token billed as plain input. `npm run dashboard` does the same as `claude-cost --dashboard`.
+
+```bash
+claude-cost --dashboard                          # writes data/dashboard.html
+claude-cost --dashboard --out ~/Desktop/cost.html
+claude-cost --dashboard --since 30d              # only the last 30 days
+```
+
+The command does not open a browser. It prints where it wrote the file and a `file://` link to it, which most terminals make clickable, so you can open it or copy it into any browser:
+
+```text
+Dashboard written to /Users/me/claude-cost/data/dashboard.html
+Open in your browser: file:///Users/me/claude-cost/data/dashboard.html
+$1,883.72 across 272 sessions, Jul 17 to Nov 11
+285k input, 10M output, 956.4M cache read, 98M cache write, 13,667 messages
+```
+
+After the link come the total cost, session count and date range, then a line with tokens by kind (input, output, cache read, cache write) and the message count.
+
+The file has the styles, script and data inlined. It needs no server, makes no network requests and works from `file://`. The filters (dates, profiles, models, projects) run in the browser, so changing one does not re-run the CLI. The CLI options that choose what to read still apply: `--since`, `--dir`, `--pricing`, `--region`, `--no-cache` and `--rebuild-cache`.
+
+File size depends on how many distinct combinations of day, hour, profile, model, project and main or subagent you have, not on how many messages. The data is one row per combination, at about 100 bytes a row. Four months of one person's use came to 605 rows, 63 KB of data and a 142 KB file, of which about 79 KB is the fixed page. Using many projects and models across most hours of the day adds rows fast, so a year of heavy use can reach a few MB. That is an estimate from the row size, not a measurement. Pass `--since` to cut the file down.
+
+It contains your project names and what each cost. By default it goes in the store folder, `data/` next to the program, which is in `.gitignore` and moves with `storeDir` in `settings.config.json`. A file written with `--out` is yours to keep private. Do not share it unless you are fine with that. If the store folder is read-only, as in an installed copy, pass `--out`.
+
+Project names come from the transcript folder names. Claude Code writes `/Users/me/Dev/app` as `-Users-me-Dev-app`, which cannot be reversed with certainty, so the CLI looks for a directory on disk that matches. If the directory is gone, the dashboard shows the folder name instead.
+
+`--dashboard` cannot be combined with `--json`, `--by-model`, `--by-month` or `--monthly`. `--out` needs `--dashboard`.
 
 ## Flags
 
@@ -57,6 +89,8 @@ claude-cost --region us             # price at the US multi-region endpoint
 | `--by-month`      | Per-month, per-model breakdown across all history                 |
 | `--by-model`      | Break totals down per model. Not with `--by-month`.               |
 | `--json`          | Output JSON instead of a table                                    |
+| `--dashboard`     | Write an HTML dashboard. See [Dashboard](#dashboard).             |
+| `--out`           | Where `--dashboard` writes. Default: `dashboard.html` in `data/`. |
 | `--dir`           | Override transcript directory. Ignores `profiles.config.json`.    |
 | `--pricing`       | Path to a custom pricing JSON. Overrides per-profile pricing.     |
 | `--region`        | Vertex AI endpoint you call. Overrides every other setting.       |

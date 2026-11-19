@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { promisify, stripVTControlCharacters } from "node:util";
 
 import { run } from "../src/cli.js";
@@ -21,6 +22,13 @@ test("rejects --no-cache together with --rebuild-cache", async () => {
   await assert.rejects(
     run(["--no-cache", "--rebuild-cache"]),
     /use either --no-cache or --rebuild-cache, not both/,
+  );
+});
+
+test("rejects an empty --out with --dashboard", async () => {
+  await assert.rejects(
+    run(["--dashboard", "--out", ""]),
+    /--out needs a file path/,
   );
 });
 
@@ -167,4 +175,86 @@ test("splits the JSON report by month and applies --since", async () => {
   assert.deepEqual(Object.keys(recent.byMonth), ["2026-10"]);
   assert.equal(recent.total.costUSD, 4);
   assert.equal(recent.total.messages, 2);
+});
+
+test("rejects --dashboard together with the other report modes", async () => {
+  for (const flag of ["--json", "--by-model", "--by-month", "--monthly"]) {
+    await assert.rejects(
+      run(["--dashboard", flag]),
+      new RegExp(`use either --dashboard or ${flag}, not both`),
+    );
+  }
+});
+
+test("rejects --out without --dashboard", async () => {
+  await assert.rejects(run(["--out", "d.html"]), /--out needs --dashboard/);
+});
+
+test("has no option to open a browser", async () => {
+  await assert.rejects(
+    run(["--dashboard", "--open"]),
+    /Unknown option '--open'/,
+  );
+});
+
+test("writes the dashboard to --out and prints the totals", async () => {
+  const { projects, pricing } = setupProject();
+  const out = path.join(
+    fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-out-")),
+    "nested",
+    "d.html",
+  );
+
+  const { stdout } = await promisify(execFile)(process.execPath, [
+    BIN,
+    "--dashboard",
+    "--out",
+    out,
+    "--dir",
+    projects,
+    "--pricing",
+    pricing,
+    "--region",
+    "global",
+    "--no-cache",
+  ]);
+  const text = stripVTControlCharacters(stdout);
+
+  assert.ok(text.includes(`Dashboard written to ${out}`));
+  assert.ok(
+    text.includes(`Open in your browser: ${pathToFileURL(out).href}\n`),
+  );
+  assert.match(text, /\$7\.00 across 1 session, /);
+  assert.match(
+    text,
+    /^1M input, 1M output, 0 cache read, 1M cache write, 3 messages$/m,
+  );
+
+  const html = fs.readFileSync(out, "utf8");
+
+  assert.ok(html.includes('"version":1'));
+  assert.ok(html.includes('"unknownModels":["claude-mystery"]'));
+});
+
+test("names --out when the dashboard cannot be written", async () => {
+  const { projects, pricing } = setupProject();
+  // A file where a folder is needed, so the write cannot succeed.
+  const blocker = path.join(path.dirname(projects), "blocker");
+  fs.writeFileSync(blocker, "");
+
+  await assert.rejects(
+    run([
+      "--dashboard",
+      "--out",
+      path.join(blocker, "d.html"),
+      "--dir",
+      projects,
+      "--pricing",
+      pricing,
+      "--region",
+      "global",
+      "--no-cache",
+    ]),
+    /cannot write the dashboard to .*d\.html: .*Pass --out <path>/,
+  );
 });

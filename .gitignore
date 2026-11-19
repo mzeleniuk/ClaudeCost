@@ -2,6 +2,7 @@
 .env
 *.log
 coverage/
+dashboard.html
 data/
 node_modules/
 profiles.config.json

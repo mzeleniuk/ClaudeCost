@@ -1,26 +1,46 @@
 // @ts-check
+import path from "node:path";
 import { parseArgs } from "node:util";
 
 import { aggregate, aggregateByMonth } from "./aggregate.js";
-import { dedupeEvents } from "./dedupe.js";
-import { findTranscripts, readUsageEvents } from "./parse.js";
+import { readEvents } from "./events.js";
 import { loadPricing } from "./pricing.js";
 import { loadProfiles } from "./profiles.js";
 import { REGIONS, validateRegion } from "./regions.js";
 import { loadSettings } from "./settings.js";
 import { parseSince, startOfMonth } from "./since.js";
-import { readStoredEvents } from "./store.js";
-import { resolveTranscriptDirs } from "./config.js";
+import { expandHome, resolveTranscriptDirs } from "./config.js";
+import { collectDashboard } from "./dashboard/collect.js";
+import {
+  fileLink,
+  summarizeDashboard,
+  summarizeTokens,
+  writeDashboardFile,
+} from "./dashboard/output.js";
+import { renderDashboard } from "./dashboard/render.js";
 import { renderJson } from "./report/json.js";
 import { renderMonthlyJson } from "./report/monthlyJson.js";
 import { renderMonthlyTable } from "./report/monthlyTable.js";
 import { renderProfileReports } from "./report/profiles.js";
+import { dim } from "./report/format.js";
 import { renderTable } from "./report/table.js";
 
-/** @import { AggregateResult, MonthlyResult, PricingTable } from "./types.js" */
+/** @import { DashboardSource } from "./dashboard/collect.js" */
+/** @import { StoreMode } from "./events.js" */
+/**
+ * @import {
+ *   AggregateResult,
+ *   MonthlyResult,
+ *   PricingTable,
+ *   Profile,
+ * } from "./types.js"
+ */
 
 // How reports name the bundled pricing file.
 const DEFAULT_PRICING_NAME = "pricing.config.json";
+
+// File name --dashboard uses in the store folder when --out is not given.
+const DEFAULT_DASHBOARD_NAME = "dashboard.html";
 
 const HELP = `
 claude-cost — approximate local cost tracking for Claude Code (Vertex AI)
@@ -37,6 +57,13 @@ OPTIONS
   --by-month          Break down totals per month and per model (all history).
   --by-model          Break down totals per model. Not needed with --by-month.
   --json              Output machine-readable JSON instead of a table.
+  --dashboard         Write an HTML dashboard of all your usage to one file.
+                      It works offline and filters in the browser. It lists
+                      project names and spend, so keep it private.
+                      Prints a file:// link to open in any browser.
+                      Not with --json, --by-model, --by-month or --monthly.
+  --out <path>        Where --dashboard writes. Default: dashboard.html in
+                      the store folder (data/, see "storeDir" below).
   --dir <path>        Override the transcript directory to scan.
                       Ignores profiles.config.json.
   --pricing <path>    Use a custom pricing JSON file.
@@ -79,13 +106,9 @@ EXAMPLES
   claude-cost --monthly --by-model
   claude-cost --since 7d --by-model
   claude-cost --since today --json
+  claude-cost --dashboard
+  claude-cost --dashboard --since 30d --out ~/Desktop/cost.html
 `;
-
-/**
- * How a run uses the usage store. `storeDir` is null with --no-cache.
- *
- * @typedef {{ storeDir: string | null, rebuild: boolean }} StoreMode
- */
 
 /**
  * Scan transcripts in `dirs`, drop duplicate snapshots and aggregate them.
@@ -98,28 +121,7 @@ async function collectReport(
   dirs,
   { pricing, since, byModel, byMonth, store },
 ) {
-  async function* allEvents() {
-    /** @type {Set<string>} */
-    const visited = new Set();
-
-    for (const dir of dirs) {
-      if (store.storeDir) {
-        yield* await readStoredEvents(dir, {
-          storeDir: store.storeDir,
-          rebuild: store.rebuild,
-          visited,
-        });
-
-        continue;
-      }
-
-      for await (const file of findTranscripts(dir, visited)) {
-        yield* readUsageEvents(file);
-      }
-    }
-  }
-
-  const deduped = await dedupeEvents(allEvents());
+  const deduped = await readEvents(dirs, store);
 
   if (byMonth) {
     return aggregateByMonth(deduped, { pricing, since });
@@ -151,6 +153,93 @@ function renderSingle(
   return json ? renderJson(totals, opts) : renderTable(totals, opts);
 }
 
+/**
+ * Region and pricing file for one source. A flag beats the profile, and the
+ * profile beats the settings. `profile` is null when --dir is used.
+ *
+ * @param {object} opts
+ * @param {Profile | null} opts.profile
+ * @param {string | undefined} opts.pricingFlag
+ * @param {string | null} opts.regionFlag
+ * @param {{ region: string }} opts.settings
+ */
+function resolveSource({ profile, pricingFlag, regionFlag, settings }) {
+  const region = regionFlag || profile?.region || settings.region;
+  const pricingPath = pricingFlag || profile?.pricing || undefined;
+
+  return {
+    region,
+    pricingFile: pricingPath ?? DEFAULT_PRICING_NAME,
+    pricing: loadPricing(pricingPath, region),
+  };
+}
+
+/**
+ * Build the dashboard data from the same profiles, directories, pricing and
+ * store the other modes use.
+ *
+ * @param {object} opts
+ * @param {Profile[] | null} opts.profiles
+ * @param {{ dir?: string, pricing?: string }} opts.flags
+ * @param {string | null} opts.regionFlag
+ * @param {{ region: string }} opts.settings
+ * @param {Date | null} opts.since
+ * @param {StoreMode} opts.store
+ */
+async function collectDashboardData({
+  profiles,
+  flags,
+  regionFlag,
+  settings,
+  since,
+  store,
+}) {
+  /** @type {DashboardSource[]} */
+  const sources = [];
+
+  if (profiles) {
+    for (const profile of profiles) {
+      const { region, pricingFile, pricing } = resolveSource({
+        profile,
+        pricingFlag: flags.pricing,
+        regionFlag,
+        settings,
+      });
+
+      const dirs = [profile.projectsDir];
+
+      sources.push({
+        name: profile.name,
+        region,
+        pricingFile,
+        pricing,
+        dirs,
+        events: await readEvents(dirs, store),
+      });
+    }
+  } else {
+    const { region, pricingFile, pricing } = resolveSource({
+      profile: null,
+      pricingFlag: flags.pricing,
+      regionFlag,
+      settings,
+    });
+
+    const dirs = resolveTranscriptDirs(flags.dir);
+
+    sources.push({
+      name: "default",
+      region,
+      pricingFile,
+      pricing,
+      dirs,
+      events: await readEvents(dirs, store),
+    });
+  }
+
+  return collectDashboard(sources, { since });
+}
+
 /** @param {string} text */
 function print(text) {
   process.stdout.write(`${text}\n`);
@@ -163,11 +252,13 @@ export async function run(argv) {
     options: {
       "by-model": { type: "boolean", default: false },
       "by-month": { type: "boolean", default: false },
+      dashboard: { type: "boolean", default: false },
       dir: { type: "string" },
       help: { type: "boolean", short: "h", default: false },
       json: { type: "boolean", default: false },
       monthly: { type: "boolean", default: false },
       "no-cache": { type: "boolean", default: false },
+      out: { type: "string" },
       pricing: { type: "string" },
       "rebuild-cache": { type: "boolean", default: false },
       region: { type: "string" },
@@ -199,6 +290,27 @@ export async function run(argv) {
     throw new Error("use either --no-cache or --rebuild-cache, not both.");
   }
 
+  if (values.dashboard) {
+    const conflicts = /** @type {const} */ ([
+      "json",
+      "by-model",
+      "by-month",
+      "monthly",
+    ]);
+
+    for (const flag of conflicts) {
+      if (values[flag]) {
+        throw new Error(`use either --dashboard or --${flag}, not both.`);
+      }
+    }
+
+    if (values.out != null && values.out.trim() === "") {
+      throw new Error("--out needs a file path.");
+    }
+  } else if (values.out != null) {
+    throw new Error("--out needs --dashboard.");
+  }
+
   const byModel = values["by-model"];
   const byMonth = values["by-month"];
   const since = values.monthly ? startOfMonth() : parseSince(values.since);
@@ -212,12 +324,49 @@ export async function run(argv) {
     rebuild: values["rebuild-cache"],
   };
 
+  if (values.dashboard) {
+    const data = await collectDashboardData({
+      profiles,
+      flags: values,
+      regionFlag,
+      settings,
+      since,
+      store,
+    });
+
+    const file = values.out
+      ? path.resolve(expandHome(values.out))
+      : path.join(settings.storeDir, DEFAULT_DASHBOARD_NAME);
+
+    const html = renderDashboard(data);
+
+    try {
+      writeDashboardFile(file, html);
+    } catch (error) {
+      throw new Error(
+        `cannot write the dashboard to ${file}: ${/** @type {Error} */ (error).message}. Pass --out <path> to write it elsewhere.`,
+      );
+    }
+
+    print(`Dashboard written to ${file}`);
+    print(`Open in your browser: ${fileLink(file)}`);
+    print(dim(summarizeDashboard(data)));
+
+    const tokens = summarizeTokens(data);
+    if (tokens) print(dim(tokens));
+
+    return;
+  }
+
   if (profiles) {
     const reports = [];
     for (const profile of profiles) {
-      const region = regionFlag || profile.region || settings.region;
-      const pricingPath = values.pricing || profile.pricing || undefined;
-      const pricing = loadPricing(pricingPath, region);
+      const { region, pricingFile, pricing } = resolveSource({
+        profile,
+        pricingFlag: values.pricing,
+        regionFlag,
+        settings,
+      });
 
       const result = await collectReport([profile.projectsDir], {
         byModel,
@@ -228,7 +377,7 @@ export async function run(argv) {
       });
 
       reports.push({
-        pricingFile: pricingPath ?? DEFAULT_PRICING_NAME,
+        pricingFile,
         profile,
         region,
         result,
@@ -247,9 +396,13 @@ export async function run(argv) {
     return;
   }
 
-  const region = regionFlag || settings.region;
+  const { region, pricingFile, pricing } = resolveSource({
+    profile: null,
+    pricingFlag: values.pricing,
+    regionFlag,
+    settings,
+  });
   const dirs = resolveTranscriptDirs(values.dir);
-  const pricing = loadPricing(values.pricing, region);
   const result = await collectReport(dirs, {
     byModel,
     byMonth,
@@ -263,7 +416,7 @@ export async function run(argv) {
       byModel,
       byMonth,
       json: values.json,
-      pricingFile: values.pricing || DEFAULT_PRICING_NAME,
+      pricingFile,
       region,
       since,
     }),
