@@ -1,0 +1,37 @@
+.heat-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 48px;
+}
+
+.panel-label {
+  margin-bottom: 8px;
+  color: var(--fg-3);
+  font-size: 11px;
+}
+
+.heat-host {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+
+.heat-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 16px;
+  color: var(--fg-3);
+  font-size: 10px;
+}
+
+.heat-legend i {
+  display: block;
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+}
+
+.heat-legend span {
+  margin: 0 4px;
+}

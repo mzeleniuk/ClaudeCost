@@ -1,0 +1,55 @@
+.kpis {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 20px;
+}
+
+.kpi {
+  flex: 1 1 150px;
+  min-width: 0;
+  padding: 0 28px;
+  border-left: 1px solid var(--line);
+}
+
+.kpi:first-child {
+  flex: 0 0 auto;
+  padding-left: 0;
+  border-left: 0;
+}
+
+.kpi-label {
+  color: var(--fg-3);
+  font-size: 11px;
+}
+
+.kpi-value {
+  margin-top: 6px;
+  font-size: 22px;
+  font-weight: 450;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.kpi-big .kpi-value {
+  font-size: 44px;
+  line-height: 1;
+  letter-spacing: -1.5px;
+}
+
+.kpi-sub {
+  margin-top: 6px;
+  color: var(--fg-3);
+  font-size: 12px;
+}
+
+.kpi-value .arrow {
+  display: inline-block;
+  margin-right: 5px;
+  color: var(--fg-3);
+  font-size: 11px;
+  vertical-align: 3px;
+}
+
+.kpi-value.dim {
+  color: var(--fg-2);
+}

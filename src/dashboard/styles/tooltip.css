@@ -1,0 +1,61 @@
+.tooltip {
+  position: fixed;
+  z-index: 60;
+  left: 0;
+  top: 0;
+  width: 240px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  font-size: 12.5px;
+  pointer-events: none;
+}
+
+.tooltip[data-pinned] {
+  border-color: var(--accent);
+}
+
+.tip-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tip-head .tip-total {
+  font-weight: 600;
+}
+
+.tip-rows {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.tip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg-2);
+}
+
+.tip-row .name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tip-row .val {
+  color: var(--fg);
+}
+
+.tip-foot {
+  margin-top: 10px;
+  color: var(--fg-3);
+  font-size: 12px;
+}

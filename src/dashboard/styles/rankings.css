@@ -1,0 +1,68 @@
+.ranking {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+}
+
+.rank {
+  padding: 7px 0 8px;
+}
+
+.rank-line {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.rank-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rank-name .sub {
+  margin-left: 8px;
+  color: var(--fg-3);
+  font-size: 11px;
+}
+
+.rank-cost {
+  color: var(--fg);
+}
+
+.rank-share {
+  width: 38px;
+  color: var(--fg-3);
+  text-align: right;
+}
+
+.rank-empty {
+  padding: 7px 0 8px;
+  color: var(--fg-3);
+}
+
+.rank-bar {
+  height: 2px;
+  margin-top: 6px;
+  background: transparent;
+}
+
+.rank-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 1px;
+  opacity: 0.65;
+}
+
+.more-btn {
+  margin-top: 6px;
+  padding: 4px 0;
+  color: var(--fg-3);
+  font-size: 11px;
+}
+
+.more-btn:hover {
+  color: var(--fg);
+}

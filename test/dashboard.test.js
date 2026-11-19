@@ -13,7 +13,11 @@ import {
   summarizeTokens,
 } from "../src/dashboard/output.js";
 import { createProjectDecoder } from "../src/dashboard/projects.js";
-import { renderDashboard, scriptSafeJson } from "../src/dashboard/render.js";
+import {
+  renderDashboard,
+  scriptSafeJson,
+  STYLES,
+} from "../src/dashboard/render.js";
 
 // Round prices so expected costs are easy to check by hand.
 const PRICING = {
@@ -610,7 +614,11 @@ function templateDir({ template, css = "body{}", app = "run();" }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-tpl-"));
 
   fs.writeFileSync(path.join(dir, "template.html"), template);
-  fs.writeFileSync(path.join(dir, "styles.css"), css);
+  fs.mkdirSync(path.join(dir, "styles"));
+
+  for (const [i, name] of STYLES.entries()) {
+    fs.writeFileSync(path.join(dir, "styles", `${name}.css`), i ? "" : css);
+  }
   fs.writeFileSync(path.join(dir, "app.js"), app);
 
   return dir;
@@ -625,10 +633,26 @@ test("renderDashboard inlines styles, script and data", () => {
   const data = collectDashboard([source(events)], { now: NOW, decodeProject });
   const html = renderDashboard(data, { dir });
 
-  assert.ok(html.includes("<style>body{}</style>"));
+  assert.ok(html.includes("<style>body{}"));
   assert.ok(html.includes("<script>run();</script>"));
   assert.ok(html.includes(`const data = ${scriptSafeJson(data)};`));
   assert.ok(html.includes('"version":1'));
+});
+
+test("renderDashboard joins the stylesheets in the listed order", () => {
+  const dir = templateDir({ template: TEMPLATE });
+
+  for (const [i, name] of STYLES.entries()) {
+    fs.writeFileSync(path.join(dir, "styles", `${name}.css`), `s${i}{}`);
+  }
+
+  fs.writeFileSync(path.join(dir, "styles", "unlisted.css"), "x{}");
+
+  const html = renderDashboard({}, { dir });
+  const expected = STYLES.map((_, i) => `s${i}{}`).join("\n\n");
+
+  assert.ok(html.includes(`<style>${expected}</style>`));
+  assert.equal(STYLES.at(-1), "responsive");
 });
 
 test("renderDashboard keeps $ patterns and marker text in the inlined parts", () => {

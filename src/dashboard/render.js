@@ -32,12 +32,39 @@ export function scriptSafeJson(value) {
 }
 
 /**
+ * The stylesheets in the styles folder. Later rules win over earlier ones
+ * at equal specificity, so responsive.css must stay last.
+ */
+export const STYLES = [
+  "tokens",
+  "base",
+  "header",
+  "layout",
+  "sidebar",
+  "kpis",
+  "charts",
+  "tooltip",
+  "rankings",
+  "heat-maps",
+  "tokens-vs-dollars",
+  "footer",
+  "responsive",
+];
+
+/** @param {string} dir Folder with the styles folder. */
+function readStyles(dir) {
+  return STYLES.map((name) =>
+    fs.readFileSync(path.join(dir, "styles", `${name}.css`), "utf8"),
+  ).join("\n\n");
+}
+
+/**
  * The dashboard page with styles, script, data and favicons inlined, so the
  * file works offline and from file://. All markers are replaced in one pass over
  * the template, so inserted text is never searched for markers.
  *
  * @param {DashboardData} data
- * @param {{ dir?: string }} [opts] Folder with template.html, styles.css and app.js.
+ * @param {{ dir?: string }} [opts] Folder with template.html, app.js and a styles folder of .css files.
  */
 export function renderDashboard(data, { dir = DIR } = {}) {
   const read = (/** @type {string} */ name) =>
@@ -58,7 +85,7 @@ export function renderDashboard(data, { dir = DIR } = {}) {
 
   /** @type {Record<string, string>} */
   const values = {
-    "/*__STYLES__*/": read("styles.css"),
+    "/*__STYLES__*/": readStyles(dir),
     "/*__APP__*/": read("app.js").replaceAll("</script", "<\\/script"),
     __DATA__: scriptSafeJson(data),
   };

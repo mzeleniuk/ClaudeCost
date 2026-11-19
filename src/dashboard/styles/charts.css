@@ -1,0 +1,78 @@
+.chart {
+  position: relative;
+  width: 100%;
+}
+
+.chart svg {
+  display: block;
+  overflow: visible;
+}
+
+.chart text {
+  fill: var(--fg-3);
+  font-family: var(--font);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart text.total {
+  fill: var(--fg-2);
+}
+
+.grid-line {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 3 5;
+}
+
+.base-line {
+  stroke: var(--line-2);
+  stroke-width: 1;
+}
+
+.avg-line {
+  fill: none;
+  stroke: var(--fg-2);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.hover-col {
+  fill: var(--hover);
+  pointer-events: none;
+}
+
+.hit {
+  fill: transparent;
+  cursor: crosshair;
+}
+
+.empty {
+  display: grid;
+  place-items: center;
+  color: var(--fg-3);
+  font-size: 12.5px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: -4px 0 14px;
+  color: var(--fg-2);
+  font-size: 12px;
+}
+
+.legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.legend .dot {
+  width: 8px;
+  height: 8px;
+}

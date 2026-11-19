@@ -1,0 +1,80 @@
+:root {
+  color-scheme: dark;
+
+  --bg: #000;
+  --surface: #0d0b0a;
+  --hover: #141210;
+  --line: #1c1a18;
+  --line-2: #36312d;
+  --fg: #fff;
+  --fg-2: #aaa39d;
+  --fg-3: #77716c;
+  --accent: #c5ac98;
+  --on-accent: #000;
+
+  /* Model families. Step 1 is the newest version, 2 and 3 are older. */
+  --opus-1: #cb7a5a;
+  --opus-2: #c42166;
+  --opus-3: #944403;
+  --sonnet-1: #4e93ed;
+  --sonnet-2: #2361a0;
+  --sonnet-3: #8453db;
+  --haiku-1: #32ac64;
+  --haiku-2: #596a03;
+  --haiku-3: #008e8c;
+
+  /* Sequential ramp for heat maps, lowest to highest spend. Zero uses --line. */
+  --heat-1: #534a42;
+  --heat-2: #6e6156;
+  --heat-3: #8a796b;
+  --heat-4: #a79281;
+  --heat-5: #c5ac98;
+
+  /* Token kinds, spaced wider than the heat ramp so neighbors stay apart. */
+  --tok-input: #d9c3b0;
+  --tok-output: #a79281;
+  --tok-write: #7d6e61;
+  --tok-read: #524840;
+
+  --font:
+    ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable",
+    "Segoe UI", system-ui, sans-serif;
+  --header-h: 60px;
+  --side-w: 248px;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #fff;
+  --surface: #f8f6f3;
+  --hover: #f1eeea;
+  --line: #e8e4df;
+  --line-2: #ccc5be;
+  --fg: #20201e;
+  --fg-2: #625d57;
+  --fg-3: #77716c;
+  --accent: #806047;
+  --on-accent: #fff;
+
+  --opus-1: #ae5235;
+  --opus-2: #9b0355;
+  --opus-3: #e17c03;
+  --sonnet-1: #236bbd;
+  --sonnet-2: #21a5fe;
+  --sonnet-3: #8776b9;
+  --haiku-1: #218347;
+  --haiku-2: #989912;
+  --haiku-3: #08aea9;
+
+  --heat-1: #c2b3a6;
+  --heat-2: #b19d8d;
+  --heat-3: #a18875;
+  --heat-4: #90745e;
+  --heat-5: #806047;
+
+  --tok-input: #5a4230;
+  --tok-output: #806047;
+  --tok-write: #a58e7b;
+  --tok-read: #c2b3a6;
+}
