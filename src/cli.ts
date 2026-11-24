@@ -3,7 +3,7 @@ import { parseArgs } from "node:util";
 
 import { aggregate, aggregateByMonth } from "./aggregate.ts";
 import { readEvents } from "./events.ts";
-import { loadPricing } from "./pricing.ts";
+import { loadPricing, priceForModel } from "./pricing.ts";
 import { loadProfiles } from "./profiles.ts";
 import { REGIONS, validateRegion } from "./regions.ts";
 import { loadSettings } from "./settings.ts";
@@ -19,10 +19,12 @@ import { renderProfileReports } from "./report/profiles.ts";
 import { dim } from "./report/format.ts";
 import { errorMessage } from "./validate.ts";
 import { renderTable } from "./report/table.ts";
+import { unpricedMessages } from "./report/unpriced.ts";
 
 import type { DashboardSource } from "./dashboard/collect.ts";
 import type { StoreMode } from "./events.ts";
 import type { ProfileReport } from "./report/profiles.ts";
+import type { Unpriced } from "./report/unpriced.ts";
 import type { AggregateResult, MonthlyResult, PricingSummary, PricingTable, Profile } from "./types.ts";
 
 // How reports name the bundled pricing file.
@@ -61,6 +63,10 @@ OPTIONS
                       cost 10% more. Overrides the region in
                       settings.config.json and in profiles.
                       ${REGIONS.join(", ")}
+  --strict            Exit with status 1 when usage comes from a model the
+                      pricing file does not list. The report still prints.
+                      Without this flag such a run prints a warning on
+                      stderr and exits with status 0.
   --no-cache          Read every transcript from disk and leave the usage
                       store alone. Totals miss deleted transcripts.
   --rebuild-cache     Read every transcript on disk again and rewrite the
@@ -91,6 +97,7 @@ EXAMPLES
   claude-cost --by-month
   claude-cost --by-month --since 2025-01-01 --json
   claude-cost --dir ~/.claude/projects --pricing ./my-prices.json
+  claude-cost --strict --json > usage.json
   claude-cost --region us --by-model
   claude-cost --monthly --by-model
   claude-cost --since 7d --by-model
@@ -181,7 +188,7 @@ function resolveSource({
 
 /**
  * Build the dashboard data from the same profiles, directories, pricing and
- * store the other modes use.
+ * store the other modes use. `unpriced` names the models each pricing file lacks.
  */
 async function collectDashboardData({
   profiles,
@@ -240,11 +247,36 @@ async function collectDashboardData({
     });
   }
 
-  return collectDashboard(sources, { since });
+  const data = collectDashboard(sources, { since });
+
+  // The dashboard merges its profiles' unknown models, so each pricing file
+  // gets the ones it lacks. A model that two files lack is listed for both.
+  const unpriced = sources.map(({ pricingFile, pricing }) => ({
+    pricingFile,
+    models: data.warnings.unknownModels.filter((model) => priceForModel(pricing, model)._unknown),
+  }));
+
+  return { data, unpriced };
 }
 
 function print(text: string) {
   process.stdout.write(`${text}\n`);
+}
+
+// The models a scan priced at $0 and the pricing file that lacks them.
+function unpricedOf({ pricingFile, result }: { pricingFile: string; result: PricingSummary }): Unpriced {
+  return { pricingFile, models: result.unknownModels };
+}
+
+/**
+ * Warn on stderr about models priced at $0. Returns the exit status: 1 when
+ * `strict` is set and there are such models, otherwise 0.
+ */
+function reportUnpriced(entries: Unpriced[], strict: boolean) {
+  const lines = unpricedMessages(entries, { strict });
+
+  for (const line of lines) console.error(line);
+  return strict && lines.length ? 1 : 0;
 }
 
 export async function run(argv: string[]) {
@@ -264,13 +296,14 @@ export async function run(argv: string[]) {
       "rebuild-cache": { type: "boolean", default: false },
       region: { type: "string" },
       since: { type: "string" },
+      strict: { type: "boolean", default: false },
     },
     allowPositionals: false,
   });
 
   if (values.help) {
     console.log(HELP);
-    return;
+    return 0;
   }
 
   if (values.monthly && values.since != null) {
@@ -320,7 +353,7 @@ export async function run(argv: string[]) {
   };
 
   if (values.dashboard) {
-    const data = await collectDashboardData({
+    const { data, unpriced } = await collectDashboardData({
       profiles,
       flags: values,
       regionFlag,
@@ -350,7 +383,7 @@ export async function run(argv: string[]) {
     const tokens = summarizeTokens(data);
     if (tokens) print(dim(tokens));
 
-    return;
+    return reportUnpriced(unpriced, values.strict);
   }
 
   const sourceFlags = { pricingFlag: values.pricing, regionFlag, settings };
@@ -359,39 +392,36 @@ export async function run(argv: string[]) {
   if (profiles) {
     const options = { since, json: values.json };
 
-    print(
-      byMonth
-        ? renderProfileReports(
-            {
-              byMonth: true,
-              reports: await collectProfileReports(profiles, sourceFlags, (dirs, pricing) =>
-                collectMonthly(dirs, scanOf(pricing)),
-              ),
-            },
-            options,
-          )
-        : renderProfileReports(
-            {
-              byMonth: false,
-              byModel,
-              reports: await collectProfileReports(profiles, sourceFlags, (dirs, pricing) =>
-                collectUsage(dirs, scanOf(pricing), byModel),
-              ),
-            },
-            options,
-          ),
+    if (byMonth) {
+      const reports = await collectProfileReports(profiles, sourceFlags, (dirs, pricing) =>
+        collectMonthly(dirs, scanOf(pricing)),
+      );
+
+      print(renderProfileReports({ byMonth: true, reports }, options));
+      return reportUnpriced(reports.map(unpricedOf), values.strict);
+    }
+
+    const reports = await collectProfileReports(profiles, sourceFlags, (dirs, pricing) =>
+      collectUsage(dirs, scanOf(pricing), byModel),
     );
 
-    return;
+    print(renderProfileReports({ byMonth: false, byModel, reports }, options));
+    return reportUnpriced(reports.map(unpricedOf), values.strict);
   }
 
   const { region, pricingFile, pricing } = resolveSource({ profile: null, ...sourceFlags });
   const dirs = resolveTranscriptDirs(values.dir);
   const origin = { region, pricingFile, since, json: values.json };
 
-  print(
-    byMonth
-      ? renderMonthly(await collectMonthly(dirs, scanOf(pricing)), origin)
-      : renderUsage(await collectUsage(dirs, scanOf(pricing), byModel), { ...origin, byModel }),
-  );
+  if (byMonth) {
+    const result = await collectMonthly(dirs, scanOf(pricing));
+
+    print(renderMonthly(result, origin));
+    return reportUnpriced([unpricedOf({ pricingFile, result })], values.strict);
+  }
+
+  const result = await collectUsage(dirs, scanOf(pricing), byModel);
+
+  print(renderUsage(result, { ...origin, byModel }));
+  return reportUnpriced([unpricedOf({ pricingFile, result })], values.strict);
 }

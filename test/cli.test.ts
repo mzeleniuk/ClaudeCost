@@ -33,8 +33,9 @@ test("rejects an invalid --since before scanning anything", async () => {
  *   m1 (claude-test-a): two snapshots, the larger one is kept. $1 + $2 = $3.
  *   m2 (claude-test-b): 1M cache writes with an empty breakdown. $4.
  *   m3 (claude-mystery): not in the pricing file. $0.
+ * With `priceMystery` the pricing file lists claude-mystery at $0, so no model is unpriced.
  */
-function setupProject() {
+function setupProject({ priceMystery = false } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-cli-"));
   const projects = path.join(root, "projects");
   const session = path.join(projects, "my-project");
@@ -94,27 +95,42 @@ function setupProject() {
     JSON.stringify({
       "claude-test-a": { ...zero, input: 1, output: 2 },
       "claude-test-b": { ...zero, input: 0, output: 0, cacheWrite: 4 },
+      ...(priceMystery && { "claude-mystery": { ...zero, input: 0, output: 0 } }),
     }),
   );
 
   return { projects, pricing };
 }
 
-async function cli(args: string[]) {
-  const { projects, pricing } = setupProject();
-  const { stdout } = await promisify(execFile)(process.execPath, [
-    BIN,
-    "--dir",
-    projects,
-    "--pricing",
-    pricing,
-    "--region",
-    "global",
-    "--no-cache",
-    ...args,
-  ]);
+// Run the CLI on the test project. Unlike `cli`, a non-zero exit does not throw.
+async function cliResult(args: string[], options?: { priceMystery?: boolean }) {
+  const { projects, pricing } = setupProject(options);
 
-  return { stdout, pricing };
+  try {
+    const { stdout, stderr } = await promisify(execFile)(process.execPath, [
+      BIN,
+      "--dir",
+      projects,
+      "--pricing",
+      pricing,
+      "--region",
+      "global",
+      "--no-cache",
+      ...args,
+    ]);
+
+    return { code: 0, stdout, stderr, pricing };
+  } catch (error) {
+    const { code, stdout, stderr } = error as { code: number; stdout: string; stderr: string };
+    return { code, stdout, stderr, pricing };
+  }
+}
+
+async function cli(args: string[]) {
+  const result = await cliResult(args);
+
+  assert.equal(result.code, 0, result.stderr);
+  return result;
 }
 
 test("prints a per-model table with the total and unknown models", async () => {
@@ -159,6 +175,46 @@ test("splits the JSON report by month and applies --since", async () => {
   assert.equal(recent.total.messages, 2);
 });
 
+test("warns on stderr about unpriced models and still exits 0", async () => {
+  const { code, stdout, stderr, pricing } = await cliResult(["--by-model"]);
+
+  assert.equal(code, 0);
+  assert.equal(stderr, `claude-cost: warning: models missing from ${pricing} are priced at $0: claude-mystery\n`);
+  assert.match(stripVTControlCharacters(stdout), /^ {5}total .* 3 +\$7\.00$/m);
+});
+
+test("keeps stdout valid JSON when it warns about unpriced models", async () => {
+  const { stdout, stderr } = await cli(["--json"]);
+
+  assert.deepEqual(JSON.parse(stdout).unknownModels, ["claude-mystery"]);
+  assert.match(stderr, /^claude-cost: warning: /);
+});
+
+test("--strict prints the report, names the unpriced models and exits 1", async () => {
+  for (const mode of [["--by-model"], ["--by-month"], ["--json"]]) {
+    const { code, stdout, stderr, pricing } = await cliResult([...mode, "--strict"]);
+
+    assert.equal(code, 1, mode.join(" "));
+    assert.equal(stderr, `claude-cost: error: models missing from ${pricing} are priced at $0: claude-mystery\n`);
+    assert.match(stdout, /\$7\.00|"costUSD": 7/);
+  }
+});
+
+test("--strict exits 0 and stays silent when every model is priced", async () => {
+  const { code, stderr } = await cliResult(["--by-model", "--strict"], { priceMystery: true });
+
+  assert.equal(code, 0);
+  assert.equal(stderr, "");
+});
+
+test("--strict ignores unpriced usage before --since", async () => {
+  // claude-mystery was used on 2026-10-20.
+  const { code, stderr } = await cliResult(["--since", "2026-10-21", "--strict"]);
+
+  assert.equal(code, 0);
+  assert.equal(stderr, "");
+});
+
 test("rejects --dashboard together with the other report modes", async () => {
   for (const flag of ["--json", "--by-model", "--by-month", "--monthly"] as const) {
     await assert.rejects(run(["--dashboard", flag]), new RegExp(`use either --dashboard or ${flag}, not both`));
@@ -201,6 +257,27 @@ test("writes the dashboard to --out and prints the totals", async () => {
 
   assert.ok(html.includes('"version":1'));
   assert.ok(html.includes('"unknownModels":["claude-mystery"]'));
+});
+
+test("--strict writes the dashboard, then exits 1 for unpriced models", async () => {
+  const { projects, pricing } = setupProject();
+  const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "claude-cost-out-")), "d.html");
+  const args = [BIN, "--dashboard", "--out", out, "--dir", projects, "--pricing", pricing, "--region", "global"];
+
+  const lenient = await promisify(execFile)(process.execPath, [...args, "--no-cache"]);
+
+  assert.match(lenient.stderr, /^claude-cost: warning: models missing from .* are priced at \$0: claude-mystery\n$/);
+
+  await assert.rejects(promisify(execFile)(process.execPath, [...args, "--no-cache", "--strict"]), (error) => {
+    const { code, stdout, stderr } = error as { code: number; stdout: string; stderr: string };
+
+    assert.equal(code, 1);
+    assert.ok(stdout.includes(`Dashboard written to ${out}`));
+    assert.match(stderr, /^claude-cost: error: models missing from .* are priced at \$0: claude-mystery\n$/);
+    return true;
+  });
+
+  assert.ok(fs.existsSync(out));
 });
 
 test("names --out when the dashboard cannot be written", async () => {

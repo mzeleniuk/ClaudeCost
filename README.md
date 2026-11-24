@@ -95,6 +95,7 @@ Project names come from the transcript folder names. Claude Code writes `/Users/
 | `--dir`           | Override transcript directory. Ignores `profiles.config.json`.    |
 | `--pricing`       | Path to a custom pricing JSON. Overrides per-profile pricing.     |
 | `--region`        | Vertex AI endpoint you call. Overrides every other setting.       |
+| `--strict`        | Exit 1 if a model has no price. See [Pricing](#pricing).          |
 | `--no-cache`      | Read transcripts from disk only. See [Usage store](#usage-store). |
 | `--rebuild-cache` | Read every transcript again and rewrite the usage store.          |
 | `-h, --help`      | Show help                                                         |
@@ -152,6 +153,18 @@ Some models charge more for long prompts. Add a `longContext` object with a `thr
     "input": 0.5, "output": 2.5, "cacheWrite": 0.625, "cacheWrite1h": 1.0, "cacheRead": 0.05
   }
 }
+```
+
+A model with no matching key is priced at $0, so the total comes out too low. Every run that uses one prints a warning on stderr, and the table and `--json` list it too:
+
+```text
+claude-cost: warning: models missing from pricing.config.json are priced at $0: claude-sonnet-4-1
+```
+
+`--strict` turns the warning into an error. The report or dashboard is still written, then the command exits with status 1, so a script can stop on an out-of-date pricing file. Usage outside `--since` does not count. Usage with no model name in the transcript is not listed, because there is no name to add to the file.
+
+```bash
+claude-cost --strict --json > usage.json || echo "update pricing.config.json"
 ```
 
 ## Usage store

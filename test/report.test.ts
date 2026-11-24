@@ -8,6 +8,7 @@ import { renderJson } from "../src/report/json.ts";
 import { renderMonthlyTable } from "../src/report/monthlyTable.ts";
 import { renderProfileReports } from "../src/report/profiles.ts";
 import { RECONCILE_NOTE, renderTable, warningLines } from "../src/report/table.ts";
+import { unpricedMessages } from "../src/report/unpriced.ts";
 
 test("unknown-model warning names the pricing file in use", () => {
   const result = { unknownModels: ["claude-opus-9"], notInRegion: [] };
@@ -17,6 +18,31 @@ test("unknown-model warning names the pricing file in use", () => {
     warningLines(result, { pricingFile: "./pricing.work.json" }).join("\n"),
     /Add them to \.\/pricing\.work\.json/,
   );
+});
+
+test("unpriced messages are empty when every model is priced", () => {
+  assert.deepEqual(unpricedMessages([], { strict: false }), []);
+  assert.deepEqual(unpricedMessages([{ pricingFile: "pricing.config.json", models: [] }], { strict: true }), []);
+});
+
+test("unpriced messages give each pricing file one line and merge repeated models", () => {
+  const entries = [
+    { pricingFile: "pricing.config.json", models: ["claude-a", "claude-b"] },
+    { pricingFile: "./pricing.work.json", models: ["claude-c"] },
+    { pricingFile: "pricing.config.json", models: ["claude-b", "claude-d"] },
+    { pricingFile: "./pricing.empty.json", models: [] },
+  ];
+
+  assert.deepEqual(unpricedMessages(entries, { strict: false }), [
+    "claude-cost: warning: models missing from pricing.config.json are priced at $0: claude-a, claude-b, claude-d",
+    "claude-cost: warning: models missing from ./pricing.work.json are priced at $0: claude-c",
+  ]);
+});
+
+test("unpriced messages are errors under --strict", () => {
+  assert.deepEqual(unpricedMessages([{ pricingFile: "pricing.config.json", models: ["claude-a"] }], { strict: true }), [
+    "claude-cost: error: models missing from pricing.config.json are priced at $0: claude-a",
+  ]);
 });
 
 test("not-in-region warning names the endpoint", () => {
