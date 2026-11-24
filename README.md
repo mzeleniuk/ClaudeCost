@@ -12,11 +12,11 @@ The package is not on npm yet, so run it from a local clone.
 
 ### Run without installing
 
-No `npm install` required:
+Requires Node.js 24.15 or newer. Run the TypeScript entry point directly:
 
 ```bash
-node bin/claude-cost.js --monthly
-node bin/claude-cost.js --since 7d --by-model
+node bin/claude-cost.ts --monthly
+node bin/claude-cost.ts --since 7d --by-model
 
 # or via npm script
 npm start -- --monthly
@@ -24,9 +24,10 @@ npm start -- --monthly
 
 ### Install globally
 
-From the clone, install the `claude-cost` command:
+From the clone, build and install the `claude-cost` command:
 
 ```bash
+npm ci
 npm install -g .
 claude-cost --help
 ```
@@ -192,9 +193,20 @@ Claude asks once before it runs the skill. To skip that prompt, add `Skill(claud
 
 ## Development
 
+The implementation, CLI entry point, dashboard and tests are TypeScript. Shared interfaces in `src/types.ts` describe usage events, raw usage records, pricing, store entries, reports and dashboard data. Configuration files still receive their existing runtime validation; transcript fields follow the provider schema after the parser checks their object shape.
+
 ```bash
-npm test        # run the built-in Node test runner
+npm ci                 # installs tools and builds through the prepare hook
+npm run typecheck      # strict checking, including tests and the dashboard DOM
+npm run build          # emits JavaScript and source maps into dist/
+npm test               # runs the Node tests on the TypeScript sources
+npm run smoke          # builds, then runs the compiled CLI and dashboard once
+npm run format:check   # checks source formatting
 ```
+
+`npm start`, `npm run monthly`, `npm run history` and `npm run dashboard` run the TypeScript entry point directly using Node 24.15+'s built-in type stripping. These commands work without a build or installed development tools. Source dashboard runs strip the types from `src/dashboard/app.ts` and inline the HTML, CSS and icons from that folder, so edits apply on the next run. After a build, `node dist/bin/claude-cost.js` runs without TypeScript or other runtime dependencies.
+
+The build copies the HTML, CSS and icons beside the compiled dashboard renderer. The compiler removes types and type-only imports before the browser script is embedded in the standalone offline page. Both source and compiled CLI runs use configuration files and `data/` at the project root. The installed `claude-cost` command points to `dist/bin/claude-cost.js`.
 
 ### Git hooks
 
@@ -204,7 +216,7 @@ The hooks are plain shell scripts in `.githooks`. Git does not use that folder b
 npm run hooks:install   # git config core.hooksPath .githooks
 ```
 
-`pre-commit` checks formatting of the staged files with Prettier and runs `npm run lint`. `pre-push` runs `npm run format:check`, `npm run lint`, `npm run typecheck` and `npm test`. To skip a hook once, pass `--no-verify` to `git commit` or `git push`.
+`pre-commit` checks formatting of the staged files with Prettier and runs `npm run typecheck`. `pre-push` runs `npm run format:check`, `npm run typecheck`, `npm test` and `npm run smoke`. The standalone typecheck includes scripts and the Claude skill wrapper that the test build excludes. To skip a hook once, pass `--no-verify` to `git commit` or `git push`.
 
 ## License
 

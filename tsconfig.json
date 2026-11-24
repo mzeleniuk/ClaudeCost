@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "erasableSyntaxOnly": true,
+    "forceConsistentCasingInFileNames": true,
+    "lib": ["es2024"],
+    "module": "nodenext",
+    "noEmit": true,
+    "noUnusedLocals": true,
+    "rewriteRelativeImportExtensions": true,
+    "strict": true,
+    "target": "es2024",
+    "types": ["node"],
+    "verbatimModuleSyntax": true
+  },
+  "include": ["bin/**/*.ts", "src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", ".claude/skills/claude-cost/*.ts"],
+  "exclude": ["src/dashboard/app.ts"]
+}

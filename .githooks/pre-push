@@ -8,11 +8,11 @@ cd "$(git rev-parse --show-toplevel)"
 echo "pre-push: checking formatting"
 npm run --silent format:check
 
-echo "pre-push: running lint"
-npm run --silent lint
-
 echo "pre-push: running typecheck"
 npm run --silent typecheck
 
 echo "pre-push: running tests"
 npm test --silent
+
+echo "pre-push: running the compiled CLI"
+npm run --silent smoke

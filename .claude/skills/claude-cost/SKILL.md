@@ -1,15 +1,15 @@
 ---
 name: claude-cost
 description: Report how much the user has spent on Claude Code, using the local claude-cost CLI that estimates spend from session transcripts. Use when the user asks about their Claude spending, cost, bill, budget, or token usage, for example "how much have I spent this month?", "what did Claude cost me this week?", or "which model costs me the most?".
-allowed-tools: Bash(node *claude-cost.js*)
+allowed-tools: Bash(node *claude-cost.ts*)
 ---
 
 # Claude Code spending
 
-`claude-cost.js` in this folder starts the CLI. Run it with node from any directory. It needs no install and makes no network calls. Use the path exactly as below. Don't add `..` to it, because this folder is usually a symlink and the CLI won't be where `..` points.
+`claude-cost.ts` in this folder starts the CLI. Run it with node from any directory. It requires Node.js 24.15 or newer and makes no network calls. Both table reports and dashboards run directly from the source without an installation or build step. Use the path exactly as below. Don't add `..` to it, because this folder is usually a symlink and the CLI won't be where `..` points.
 
 ```bash
-node "${CLAUDE_SKILL_DIR}/claude-cost.js" --monthly --by-model
+node "${CLAUDE_SKILL_DIR}/claude-cost.ts" --monthly --by-model
 ```
 
 Pick flags from the question:

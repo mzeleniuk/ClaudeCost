@@ -4,6 +4,7 @@
 coverage/
 dashboard.html
 data/
+dist/
 node_modules/
 profiles.config.json
 settings.config.json

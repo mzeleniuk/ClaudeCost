@@ -1,5 +1,5 @@
 #!/bin/sh
-# Checks formatting of staged files and syntax of the JavaScript sources.
+# Checks formatting of staged files and types of the TypeScript sources.
 
 set -e
 
@@ -12,5 +12,5 @@ if [ -n "$staged" ]; then
   echo "$staged" | tr '\n' '\0' | xargs -0 npx --no-install prettier --check --ignore-unknown
 fi
 
-echo "pre-commit: running lint"
-npm run --silent lint
+echo "pre-commit: running typecheck"
+npm run --silent typecheck

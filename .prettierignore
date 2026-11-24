@@ -1,5 +1,6 @@
 coverage/
 dashboard.html
 data/
+dist/
 node_modules/
 package-lock.json

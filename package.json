@@ -1,6 +1,6 @@
 {
   "name": "claude-cost",
-  "version": "0.9.3",
+  "version": "0.10.0",
   "private": true,
   "description": "Approximate local cost tracking for Claude Code by parsing session transcripts.",
   "type": "module",
@@ -9,27 +9,30 @@
     "node": ">=24.15.0"
   },
   "bin": {
-    "claude-cost": "bin/claude-cost.js"
+    "claude-cost": "dist/bin/claude-cost.js"
   },
   "files": [
-    "bin",
+    "!dist/**/*.map",
+    "dist/bin",
+    "dist/src",
     "pricing.config.json",
     "profiles.config.example.json",
     "README.md",
-    "settings.config.example.json",
-    "src"
+    "settings.config.example.json"
   ],
   "scripts": {
-    "dashboard": "node bin/claude-cost.js --dashboard",
+    "build": "node scripts/clean.ts && tsc -p tsconfig.build.json && tsc -p src/dashboard/tsconfig.build.json && node scripts/build.ts",
+    "dashboard": "node bin/claude-cost.ts --dashboard",
     "format:check": "prettier --check .",
     "format": "prettier --write .",
-    "history": "node bin/claude-cost.js --by-month",
+    "history": "node bin/claude-cost.ts --by-month",
     "hooks:install": "git config core.hooksPath .githooks",
-    "lint": "for f in bin/*.js src/*.js src/dashboard/*.js src/report/*.js; do node --check \"$f\"; done",
-    "monthly": "node bin/claude-cost.js --monthly --by-model",
-    "start": "node bin/claude-cost.js",
-    "test": "node --test",
-    "typecheck": "tsc -p jsconfig.json"
+    "monthly": "node bin/claude-cost.ts --monthly --by-model",
+    "prepare": "npm run build",
+    "smoke": "npm run build && node scripts/smoke.ts",
+    "start": "node bin/claude-cost.ts",
+    "test": "node --test \"test/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.json && tsc -p src/dashboard/tsconfig.json"
   },
   "keywords": [
     "claude-code",
