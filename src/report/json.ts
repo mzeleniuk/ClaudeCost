@@ -1,14 +1,16 @@
 import { formatJson, roundCost } from "./format.ts";
+import { skippedLines } from "./skipped.ts";
 import type { AggregateResult } from "../types.ts";
 
 // Totals for one scan, without the report envelope.
 export function buildUsageProfile(
-  { archivedTranscripts, groups, notInRegion, total, unknownModels }: AggregateResult,
+  { archivedTranscripts, groups, notInRegion, parse, total, unknownModels }: AggregateResult,
   { byModel }: { byModel: boolean },
 ) {
   return {
     archivedTranscripts,
     notInRegion,
+    skippedLines: skippedLines(parse),
     total: roundCost(total),
     unknownModels,
     ...(byModel && {
@@ -31,6 +33,7 @@ export function renderJson(
     notInRegion: profile.notInRegion,
     region,
     since: since ? since.toISOString() : null,
+    skippedLines: profile.skippedLines,
     total: profile.total,
     unknownModels: profile.unknownModels,
     ...(byModel && { byModel: profile.byModel }),

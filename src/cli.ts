@@ -4,6 +4,7 @@ import { parseArgs } from "node:util";
 import { aggregate, aggregateByMonth } from "./aggregate.ts";
 import { backupStore } from "./backup.ts";
 import { readEvents } from "./events.ts";
+import { emptyParseStats } from "./parse.ts";
 import { loadPricing, priceForModel } from "./pricing.ts";
 import { loadProfiles } from "./profiles.ts";
 import { REGIONS, validateRegion } from "./regions.ts";
@@ -20,13 +21,14 @@ import { renderProfileReports } from "./report/profiles.ts";
 import { dim } from "./report/format.ts";
 import { errorMessage } from "./validate.ts";
 import { renderTable } from "./report/table.ts";
+import { skippedMessage } from "./report/skipped.ts";
 import { unpricedMessages } from "./report/unpriced.ts";
 
 import type { DashboardSource } from "./dashboard/collect.ts";
 import type { StoreMode } from "./events.ts";
 import type { ProfileReport } from "./report/profiles.ts";
 import type { Unpriced } from "./report/unpriced.ts";
-import type { AggregateResult, MonthlyResult, PricingSummary, PricingTable, Profile } from "./types.ts";
+import type { AggregateResult, MonthlyResult, ParseStats, PricingSummary, PricingTable, Profile } from "./types.ts";
 
 // How reports name the bundled pricing file.
 const DEFAULT_PRICING_NAME = "pricing.config.json";
@@ -65,7 +67,8 @@ OPTIONS
                       settings.config.json and in profiles.
                       ${REGIONS.join(", ")}
   --strict            Exit with status 1 when usage comes from a model the
-                      pricing file does not list. The report still prints.
+                      pricing file does not list, or when transcript lines
+                      with usage could not be read. The report still prints.
                       Without this flag such a run prints a warning on
                       stderr and exits with status 0.
   --backup <path>     Copy the usage store into a new claude-cost-backup-<time>
@@ -121,12 +124,14 @@ interface Scan {
 
 // Scan transcripts in `dirs`, drop duplicate snapshots and total them, grouped by model on request.
 async function collectUsage(dirs: string[], { pricing, since, store }: Scan, byModel: boolean) {
-  return aggregate(await readEvents(dirs, store), { pricing, since, byModel });
+  const parse = emptyParseStats();
+  return aggregate(await readEvents(dirs, store, parse), { pricing, since, byModel, parse });
 }
 
 // Scan transcripts in `dirs`, drop duplicate snapshots and total them per month and model.
 async function collectMonthly(dirs: string[], { pricing, since, store }: Scan) {
-  return aggregateByMonth(await readEvents(dirs, store), { pricing, since });
+  const parse = emptyParseStats();
+  return aggregateByMonth(await readEvents(dirs, store, parse), { pricing, since, parse });
 }
 
 // One report per profile, each scanned with the region and pricing file that profile resolves to.
@@ -212,6 +217,7 @@ async function collectDashboardData({
   store: StoreMode;
 }) {
   const sources: DashboardSource[] = [];
+  const parse = emptyParseStats();
 
   if (profiles) {
     for (const profile of profiles) {
@@ -230,7 +236,7 @@ async function collectDashboardData({
         pricingFile,
         pricing,
         dirs,
-        events: await readEvents(dirs, store),
+        events: await readEvents(dirs, store, parse),
       });
     }
   } else {
@@ -249,7 +255,7 @@ async function collectDashboardData({
       pricingFile,
       pricing,
       dirs,
-      events: await readEvents(dirs, store),
+      events: await readEvents(dirs, store, parse),
     });
   }
 
@@ -262,7 +268,7 @@ async function collectDashboardData({
     models: data.warnings.unknownModels.filter((model) => priceForModel(pricing, model)._unknown),
   }));
 
-  return { data, unpriced };
+  return { data, unpriced, parse };
 }
 
 function print(text: string) {
@@ -275,11 +281,13 @@ function unpricedOf({ pricingFile, result }: { pricingFile: string; result: Pric
 }
 
 /**
- * Warn on stderr about models priced at $0. Returns the exit status: 1 when
- * `strict` is set and there are such models, otherwise 0.
+ * Warn on stderr about models priced at $0 and transcript lines that could
+ * not be read. Returns the exit status: 1 when `strict` is set and there is
+ * either, otherwise 0.
  */
-function reportUnpriced(entries: Unpriced[], strict: boolean) {
-  const lines = unpricedMessages(entries, { strict });
+function reportWarnings(entries: Unpriced[], scans: ParseStats[], strict: boolean) {
+  const skipped = skippedMessage(scans, { strict });
+  const lines = [...unpricedMessages(entries, { strict }), ...(skipped ? [skipped] : [])];
 
   for (const line of lines) console.error(line);
   return strict && lines.length ? 1 : 0;
@@ -374,7 +382,7 @@ export async function run(argv: string[]) {
   };
 
   if (values.dashboard) {
-    const { data, unpriced } = await collectDashboardData({
+    const { data, unpriced, parse } = await collectDashboardData({
       profiles,
       flags: values,
       regionFlag,
@@ -404,7 +412,7 @@ export async function run(argv: string[]) {
     const tokens = summarizeTokens(data);
     if (tokens) print(dim(tokens));
 
-    return reportUnpriced(unpriced, values.strict);
+    return reportWarnings(unpriced, [parse], values.strict);
   }
 
   const sourceFlags = { pricingFlag: values.pricing, regionFlag, settings };
@@ -419,7 +427,12 @@ export async function run(argv: string[]) {
       );
 
       print(renderProfileReports({ byMonth: true, reports }, options));
-      return reportUnpriced(reports.map(unpricedOf), values.strict);
+
+      return reportWarnings(
+        reports.map(unpricedOf),
+        reports.map((report) => report.result.parse),
+        values.strict,
+      );
     }
 
     const reports = await collectProfileReports(profiles, sourceFlags, (dirs, pricing) =>
@@ -427,7 +440,12 @@ export async function run(argv: string[]) {
     );
 
     print(renderProfileReports({ byMonth: false, byModel, reports }, options));
-    return reportUnpriced(reports.map(unpricedOf), values.strict);
+
+    return reportWarnings(
+      reports.map(unpricedOf),
+      reports.map((report) => report.result.parse),
+      values.strict,
+    );
   }
 
   const { region, pricingFile, pricing } = resolveSource({ profile: null, ...sourceFlags });
@@ -438,11 +456,11 @@ export async function run(argv: string[]) {
     const result = await collectMonthly(dirs, scanOf(pricing));
 
     print(renderMonthly(result, origin));
-    return reportUnpriced([unpricedOf({ pricingFile, result })], values.strict);
+    return reportWarnings([unpricedOf({ pricingFile, result })], [result.parse], values.strict);
   }
 
   const result = await collectUsage(dirs, scanOf(pricing), byModel);
 
   print(renderUsage(result, { ...origin, byModel }));
-  return reportUnpriced([unpricedOf({ pricingFile, result })], values.strict);
+  return reportWarnings([unpricedOf({ pricingFile, result })], [result.parse], values.strict);
 }

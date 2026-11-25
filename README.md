@@ -96,7 +96,7 @@ Project names come from the transcript folder names. Claude Code writes `/Users/
 | `--dir`           | Override transcript directory. Ignores `profiles.config.json`.    |
 | `--pricing`       | Path to a custom pricing JSON. Overrides per-profile pricing.     |
 | `--region`        | Vertex AI endpoint you call. Overrides every other setting.       |
-| `--strict`        | Exit 1 if a model has no price. See [Pricing](#pricing).          |
+| `--strict`        | Exit 1 on an unpriced model or an unreadable line. See below.     |
 | `--backup`        | Copy the usage store into a new folder in this path, then exit.   |
 | `--no-cache`      | Read transcripts from disk only. See [Usage store](#usage-store). |
 | `--rebuild-cache` | Read every transcript again and rewrite the usage store.          |
@@ -168,6 +168,22 @@ claude-cost: warning: models missing from pricing.config.json are priced at $0: 
 ```bash
 claude-cost --strict --json > usage.json || echo "update pricing.config.json"
 ```
+
+## Unreadable transcript lines
+
+Claude Code does not document the transcript format, so a new version may change it. The parser counts every line that has a `"usage"` key and that it cannot use:
+
+- The line is not valid JSON.
+- The line is an assistant record with no `usage` object, for example because the object moved.
+- The `usage` object has no recognized token count, or a count that is not a number, for example because the fields were renamed.
+
+Each run that finds such lines prints a warning on stderr with the counts and the first failing file and byte offset:
+
+```text
+claude-cost: warning: 3 of 12,040 transcript lines with usage could not be read (2 not valid JSON, 1 without recognized token counts). Totals may be too low, and Claude Code may have changed its transcript format. First: ~/.claude/projects/proj/a.jsonl, byte 5120: not valid JSON.
+```
+
+`--json` reports the counts as `skippedLines`, and `--strict` exits with status 1. The usage store saves the counts for each transcript, so the warning stays on later runs. It clears when the transcript is rewritten or `--rebuild-cache` reads it again and finds nothing wrong. Counts for a deleted transcript stay, like its usage. A store saved before this check has no counts until `--rebuild-cache`. A last line without a newline is not counted, because Claude Code may still be writing it. A format change that renames the `"usage"` key itself is not detected, because the parser skips lines without that key.
 
 ## Usage store
 
@@ -244,6 +260,18 @@ npm run lint           # runs oxlint with type-aware rules
 `npm start`, `npm run monthly`, `npm run history` and `npm run dashboard` run the TypeScript entry point directly using Node 24.15+'s built-in type stripping. These commands work without a build or installed development tools. Source dashboard runs strip the types from `src/dashboard/app.ts` and inline the HTML, CSS and icons from that folder, so edits apply on the next run. After a build, `node dist/bin/claude-cost.js` runs without TypeScript or other runtime dependencies.
 
 The build copies the HTML, CSS and icons beside the compiled dashboard renderer. The compiler removes types and type-only imports before the browser script is embedded in the standalone offline page. Both source and compiled CLI runs use configuration files and `data/` at the project root. The installed `claude-cost` command points to `dist/bin/claude-cost.js`.
+
+### Transcript fixtures
+
+`test/transcripts` holds real usage records from several Claude Code versions, each with an `.expected.json` file of the events they must give. `test/transcript-drift.test.ts` checks them, and `test/transcript-fuzz.test.ts` mutates them with a seeded generator. `FUZZ_SEED` and `FUZZ_RUNS` change the seed and the number of runs. A failure prints its seed and run number.
+
+When a new Claude Code version changes the usage format, add a fixture for it. The script keeps the usage object as written and replaces ids and timestamps. It drops message text.
+
+```bash
+node scripts/sanitize-transcript.ts ~/.claude/projects test/transcripts <new-version>
+```
+
+It writes a `.jsonl` file and an `.expected.json` file for each version you list. Check the expected file by hand against the transcript, then run `npm test`.
 
 ### Git hooks
 

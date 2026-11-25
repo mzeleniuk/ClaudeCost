@@ -1,0 +1,22 @@
+[
+  {
+    "messageId": "msg-2.1.228-0",
+    "requestId": "req-2.1.228-0",
+    "model": "claude-sonnet-5",
+    "ts": "2026-03-01T10:01:00.000Z",
+    "input": 2,
+    "output": 91,
+    "cacheRead": 0,
+    "cacheWrite": 38522
+  },
+  {
+    "messageId": "msg-2.1.228-1",
+    "requestId": "req-2.1.228-1",
+    "model": "claude-sonnet-5",
+    "ts": "2026-03-01T10:02:00.000Z",
+    "input": 2,
+    "output": 4,
+    "cacheRead": 0,
+    "cacheWrite": 10433
+  }
+]

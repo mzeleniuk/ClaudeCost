@@ -9,7 +9,9 @@ import {
   readUsageEvents,
   normalizeUsage,
   advisorUsagesFromRaw,
+  parseUsageLine,
   parseUsageRecord,
+  scanUsageRecords,
 } from "../src/parse.ts";
 
 const FIXTURES = path.join(import.meta.dirname, "fixtures");
@@ -116,6 +118,38 @@ test("normalizeUsage uses the flat count when the breakdown is empty", () => {
     assert.equal(u.cacheWrite5m, null);
     assert.equal(u.cacheWrite1h, null);
     assert.equal(u.cacheWrite, 1_000_000);
+  }
+});
+
+test("normalizeUsage counts a token field that is not a number as 0", () => {
+  const u = normalizeUsage({
+    input_tokens: "5" as unknown as number,
+    output_tokens: null as unknown as number,
+    cache_read_input_tokens: Number.NaN,
+    cache_creation_input_tokens: 9,
+    cache_creation: { ephemeral_5m_input_tokens: "3" as unknown as number },
+  });
+
+  assert.deepEqual([u.input, u.output, u.cacheRead, u.cacheWrite, u.hasCacheBreakdown], [0, 0, 0, 9, false]);
+});
+
+test("parseUsageLine reports why a line gave no usable record", () => {
+  const usage = { input_tokens: 1 };
+
+  assert.deepEqual(parseUsageLine(""), { record: null, problem: null });
+  assert.deepEqual(parseUsageLine("[1]"), { record: null, problem: null });
+  assert.deepEqual(parseUsageLine('{"usage":'), { record: null, problem: "invalidJson" });
+  assert.deepEqual(parseUsageLine('{"type":"user","message":{"usage":1}}'), { record: null, problem: null });
+  assert.deepEqual(parseUsageLine('{"type":"assistant","message":{"usage":1}}'), { record: null, problem: "noUsage" });
+  assert.equal(parseUsageLine(JSON.stringify({ message: { usage: { prompt_tokens: 1 } } })).problem, "badTokenCounts");
+  assert.equal(parseUsageLine(JSON.stringify({ message: { usage } })).problem, null);
+});
+
+test("scanUsageRecords gives the same result for any read size", async () => {
+  const whole = await scanUsageRecords(SAMPLE);
+
+  for (const chunkBytes of [1, 2, 13, 4096]) {
+    assert.deepEqual(await scanUsageRecords(SAMPLE, 0, { chunkBytes }), whole, `chunkBytes ${chunkBytes}`);
   }
 });
 

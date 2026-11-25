@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { stripVTControlCharacters } from "node:util";
 
+import { emptyParseStats } from "../src/parse.ts";
 import { fmtTokens, fmtUSD } from "../src/report/format.ts";
 import { renderJson } from "../src/report/json.ts";
 import { renderMonthlyTable } from "../src/report/monthlyTable.ts";
@@ -62,7 +63,13 @@ const totals = (inputTokens: number, costUSD: number, messages: number = 1) => (
   messages,
 });
 
-const summary = (total: Totals) => ({ notInRegion: [], total, unknownModels: [], archivedTranscripts: 0 });
+const summary = (total: Totals) => ({
+  notInRegion: [],
+  total,
+  unknownModels: [],
+  archivedTranscripts: 0,
+  parse: emptyParseStats(),
+});
 
 test("fmtUSD and fmtTokens keep figures short", () => {
   assert.equal(fmtUSD(36.9372), "$36.94");

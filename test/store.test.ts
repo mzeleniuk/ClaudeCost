@@ -7,7 +7,7 @@ import path from "node:path";
 
 import { aggregate } from "../src/aggregate.ts";
 import { dedupeEvents } from "../src/dedupe.ts";
-import { eventsFromRecord } from "../src/parse.ts";
+import { emptyParseStats, eventsFromRecord } from "../src/parse.ts";
 import { STORE_VERSION, compactRecords, readStoredEvents, storeFileName } from "../src/store.ts";
 
 /**
@@ -368,4 +368,84 @@ test("collapses copies of a message split across two runs", async (t) => {
       ["m2", 20],
     ],
   );
+});
+
+// Lines the parser cannot use, one of each kind.
+const BAD_JSON = '{"type":"assistant","message":{"usage":{"input_tokens":5';
+const BAD_COUNTS = JSON.stringify({ type: "assistant", message: { id: "m", usage: { prompt_tokens: 5 } } });
+
+// What a read adds up for the skipped lines.
+async function skippedOf(s: ReturnType<typeof setup>, opts: { rebuild?: boolean } = {}) {
+  const parse = emptyParseStats();
+  await s.read({ ...opts, parse });
+
+  return [parse.invalidJson, parse.badTokenCounts, parse.lines];
+}
+
+test("keeps skipped line counts across runs and adds the ones in appended lines", async (t) => {
+  const s = setup();
+  t.after(() => fs.rmSync(s.root, { recursive: true, force: true }));
+  const file = s.transcript("a.jsonl");
+
+  fs.writeFileSync(file, `${line("m1", 10)}\n${BAD_JSON}\n`);
+  assert.deepEqual(await skippedOf(s), [1, 0, 2]);
+
+  // The second run reads nothing, and the warning stays.
+  assert.deepEqual(await skippedOf(s), [1, 0, 2]);
+
+  fs.appendFileSync(file, `${BAD_COUNTS}\n${line("m2", 5)}\n`);
+  assert.deepEqual(await skippedOf(s), [1, 1, 4]);
+  assert.deepEqual(await skippedOf(s), [1, 1, 4]);
+
+  const { skipped } = s.readStore().files[path.join("proj", "a.jsonl")];
+  assert.equal(skipped.invalidJson, 1);
+  assert.match(skipped.example, /a\.jsonl, byte \d+: not valid JSON$/);
+});
+
+test("a rewritten transcript and a rebuild start its skipped counts again", async (t) => {
+  const s = setup();
+  t.after(() => fs.rmSync(s.root, { recursive: true, force: true }));
+  const file = s.transcript("a.jsonl");
+
+  fs.writeFileSync(file, `${BAD_JSON}\n${line("m1", 10)}\n`);
+  assert.deepEqual(await skippedOf(s), [1, 0, 2]);
+
+  fs.writeFileSync(file, `${line("m1", 10)}\n${line("m2", 5)}\n`);
+  assert.deepEqual(await skippedOf(s), [0, 0, 2]);
+
+  fs.appendFileSync(file, `${BAD_JSON}\n`);
+  assert.deepEqual(await skippedOf(s), [1, 0, 3]);
+  assert.deepEqual(await skippedOf(s, { rebuild: true }), [1, 0, 3]);
+});
+
+test("skipped counts of a deleted transcript stay, because its usage does", async (t) => {
+  const s = setup();
+  t.after(() => fs.rmSync(s.root, { recursive: true, force: true }));
+  const file = s.transcript("a.jsonl");
+
+  fs.writeFileSync(file, `${line("m1", 10)}\n${BAD_JSON}\n`);
+  await skippedOf(s);
+  fs.rmSync(file);
+
+  assert.deepEqual(await skippedOf(s), [1, 0, 2]);
+});
+
+test("a store written before skipped counts reads without them", async (t) => {
+  const s = setup();
+  t.after(() => fs.rmSync(s.root, { recursive: true, force: true }));
+  const file = s.transcript("a.jsonl");
+
+  fs.writeFileSync(file, `${line("m1", 10)}\n${BAD_JSON}\n`);
+  await s.read();
+
+  const store = s.readStore();
+  delete store.files[path.join("proj", "a.jsonl")].skipped;
+  fs.writeFileSync(s.storeFile(), JSON.stringify(store));
+
+  assert.deepEqual(await skippedOf(s), [0, 0, 0]);
+
+  // Appending reads only the new bytes, so the old bad line stays uncounted until a rebuild.
+  fs.appendFileSync(file, `${BAD_COUNTS}\n`);
+  assert.deepEqual(await skippedOf(s), [0, 1, 1]);
+  assert.deepEqual(await skippedOf(s, { rebuild: true }), [1, 1, 3]);
 });

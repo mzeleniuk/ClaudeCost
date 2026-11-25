@@ -5,10 +5,9 @@ import os from "node:os";
 import path from "node:path";
 
 import { usageTokenTotal } from "./dedupe.ts";
-import { eventsFromRecord, findTranscripts, scanUsageRecords } from "./parse.ts";
+import { addParseStats, emptyParseStats, eventsFromRecord, findTranscripts, scanUsageRecords } from "./parse.ts";
 import { errorMessage, isPlainObject } from "./validate.ts";
-
-import type { StoreEntry, UsageEvent, UsageRecord } from "./types.ts";
+import type { ParseStats, StoreEntry, UsageEvent, UsageRecord } from "./types.ts";
 
 /**
  * Local usage store. Sits next to pricing.config.json and is not committed.
@@ -194,6 +193,7 @@ function isEntry(entry: unknown): entry is StoreEntry {
     typeof entry.check === "string" &&
     Array.isArray(entry.records) &&
     entry.records.every((record) => isPlainObject(record?.usage)) &&
+    (entry.skipped === undefined || isPlainObject(entry.skipped)) &&
     (entry.deletedAt === undefined || typeof entry.deletedAt === "string")
   );
 }
@@ -285,6 +285,7 @@ function saveStore(file: string, realDir: string, files: Record<string, StoreEnt
  * the last run when the file was appended to, and the whole file otherwise.
  * `tail` holds records from a last line with no newline yet. They count in
  * this run but are not saved, so the line is read again once it is complete.
+ * `skipped` on the entry adds up the lines every scan could not read.
  */
 async function refreshEntry(
   file: string,
@@ -302,6 +303,9 @@ async function refreshEntry(
       const scan = await scanUsageRecords(file, entry.offset);
       if (unchanged) return { entry, tail: scan.tail, updated: false };
 
+      const skipped = { ...emptyParseStats(), ...entry.skipped };
+      addParseStats(skipped, scan.skipped);
+
       return {
         entry: {
           check: await checkAt(file, scan.end),
@@ -309,6 +313,7 @@ async function refreshEntry(
           offset: scan.end,
           records: compactRecords([...entry.records, ...scan.records]),
           size: stats.size,
+          skipped,
         },
         tail: scan.tail,
         updated: true,
@@ -325,6 +330,7 @@ async function refreshEntry(
       offset: scan.end,
       records: compactRecords(scan.records),
       size: stats.size,
+      skipped: scan.skipped,
     },
     tail: scan.tail,
     updated: true,
@@ -339,6 +345,10 @@ async function refreshEntry(
  *
  * With `rebuild`, every transcript on disk is read in full. Entries for
  * deleted transcripts are kept, since they cannot be read again.
+ *
+ * Pass `parse` to add up the lines that could not be read, across every
+ * run since each transcript was last read in full. Entries saved before
+ * the store kept these counts have none.
  */
 export async function readStoredEvents(
   projectsDir: string,
@@ -347,7 +357,14 @@ export async function readStoredEvents(
     rebuild = false,
     visited = new Set(),
     warn = printWarning,
-  }: { storeDir: string; rebuild?: boolean; visited?: Set<string>; warn?: (message: string) => void },
+    parse,
+  }: {
+    storeDir: string;
+    rebuild?: boolean;
+    visited?: Set<string>;
+    warn?: (message: string) => void;
+    parse?: ParseStats;
+  },
 ): Promise<UsageEvent[]> {
   let realDir;
 
@@ -391,6 +408,12 @@ export async function readStoredEvents(
   }
 
   const now = new Date().toISOString();
+
+  if (parse) {
+    for (const entry of Object.values(files)) {
+      if (entry.skipped) addParseStats(parse, { ...emptyParseStats(), ...entry.skipped });
+    }
+  }
 
   for (const [key, entry] of Object.entries(files)) {
     if (seen.has(key)) continue;

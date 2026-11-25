@@ -1,3 +1,4 @@
+import { emptyParseStats } from "./parse.ts";
 import { priceForModel, computeCost } from "./pricing.ts";
 import { monthKey } from "./since.ts";
 import { addUsage, emptyTotals } from "./totals.ts";
@@ -6,6 +7,7 @@ import type {
   AggregateResult,
   MonthTotals,
   MonthlyResult,
+  ParseStats,
   PricingSummary,
   PricingTable,
   Totals,
@@ -33,7 +35,7 @@ function getOrInit<K, V>(map: Map<K, V>, key: K, init: () => V): V {
  */
 async function sumEvents(
   events: Events,
-  { pricing, since }: { pricing: PricingTable; since: Date | null },
+  { pricing, since, parse }: { pricing: PricingTable; since: Date | null; parse: ParseStats },
   bucketsFor: (event: UsageEvent) => Totals[] | null,
 ): Promise<PricingSummary> {
   const archived = new Set<string>();
@@ -62,6 +64,7 @@ async function sumEvents(
   return {
     archivedTranscripts: archived.size,
     notInRegion: [...notInRegion],
+    parse,
     total,
     unknownModels: [...unknownModels].filter((m) => m && m !== "unknown"),
   };
@@ -70,10 +73,15 @@ async function sumEvents(
 // Aggregate usage events into totals, optionally grouped by model.
 export async function aggregate(
   events: Events,
-  { pricing, since = null, byModel = false }: { pricing: PricingTable; since?: Date | null; byModel?: boolean },
+  {
+    pricing,
+    since = null,
+    byModel = false,
+    parse = emptyParseStats(),
+  }: { pricing: PricingTable; since?: Date | null; byModel?: boolean; parse?: ParseStats },
 ): Promise<AggregateResult> {
   const groups: Map<string, Totals> = new Map();
-  const summary = await sumEvents(events, { pricing, since }, (event) =>
+  const summary = await sumEvents(events, { pricing, since, parse }, (event) =>
     byModel ? [getOrInit(groups, event.model, emptyTotals)] : [],
   );
 
@@ -83,15 +91,20 @@ export async function aggregate(
 /**
  * Aggregate usage events into per-month, per-model totals. Months are local
  * "YYYY-MM" keys. Events without a timestamp are counted in `skippedUndated`.
+ * `parse` goes into the result as it is, for the report to show.
  */
 export async function aggregateByMonth(
   events: Events,
-  { pricing, since = null }: { pricing: PricingTable; since?: Date | null },
+  {
+    pricing,
+    since = null,
+    parse = emptyParseStats(),
+  }: { pricing: PricingTable; since?: Date | null; parse?: ParseStats },
 ): Promise<MonthlyResult> {
   const months: Map<string, MonthTotals> = new Map();
   let skippedUndated = 0;
 
-  const summary = await sumEvents(events, { pricing, since }, (event) => {
+  const summary = await sumEvents(events, { pricing, since, parse }, (event) => {
     const key = monthKey(event.ts);
 
     if (!key) {

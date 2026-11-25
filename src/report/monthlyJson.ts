@@ -1,5 +1,6 @@
 import { sortedMonths } from "../aggregate.ts";
 import { formatJson, roundCost } from "./format.ts";
+import { skippedLines } from "./skipped.ts";
 import type { MonthlyResult, Totals } from "../types.ts";
 
 // Monthly totals for one scan, without the report envelope.
@@ -7,6 +8,7 @@ export function buildMonthlyProfile({
   archivedTranscripts,
   months,
   notInRegion,
+  parse,
   skippedUndated,
   total,
   unknownModels,
@@ -24,6 +26,7 @@ export function buildMonthlyProfile({
     archivedTranscripts,
     byMonth,
     notInRegion,
+    skippedLines: skippedLines(parse),
     skippedUndated,
     total: roundCost(total),
     unknownModels,
@@ -42,6 +45,7 @@ export function renderMonthlyJson(result: MonthlyResult, { since, region }: { si
     notInRegion: profile.notInRegion,
     region,
     since: since ? since.toISOString() : null,
+    skippedLines: profile.skippedLines,
     skippedUndated: profile.skippedUndated,
     total: profile.total,
     unknownModels: profile.unknownModels,

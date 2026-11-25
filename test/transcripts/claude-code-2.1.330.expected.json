@@ -1,0 +1,12 @@
+[
+  {
+    "messageId": "msg-2.1.330-0",
+    "requestId": "req-2.1.330-0",
+    "model": "claude-sonnet-5-5",
+    "ts": "2026-07-01T10:01:00.000Z",
+    "input": 2,
+    "output": 295,
+    "cacheRead": 0,
+    "cacheWrite": 39123
+  }
+]

@@ -67,7 +67,21 @@ export interface StoreEntry {
   offset: number;
   check: string;
   records: UsageRecord[];
+  skipped?: ParseStats;
   deletedAt?: string;
+}
+
+/**
+ * What a scan could not read. `lines` counts the lines that contain the
+ * literal "usage" key. The other counts are lines the parser dropped, and
+ * `example` says where and why the first one failed.
+ */
+export interface ParseStats {
+  lines: number;
+  invalidJson: number;
+  noUsage: number;
+  badTokenCounts: number;
+  example: string | null;
 }
 
 // USD per 1,000,000 tokens.
@@ -104,6 +118,7 @@ export interface PricingSummary {
   unknownModels: string[];
   notInRegion: string[];
   archivedTranscripts: number;
+  parse: ParseStats;
 }
 
 /**
