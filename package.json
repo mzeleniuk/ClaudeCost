@@ -1,6 +1,6 @@
 {
   "name": "claude-cost",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "private": true,
   "description": "Approximate local cost tracking for Claude Code by parsing session transcripts.",
   "type": "module",
@@ -27,11 +27,13 @@
     "format": "prettier --write .",
     "history": "node bin/claude-cost.ts --by-month",
     "hooks:install": "git config core.hooksPath .githooks",
+    "lint": "oxlint --type-aware",
     "monthly": "node bin/claude-cost.ts --monthly --by-model",
     "prepare": "npm run build",
     "smoke": "npm run build && node scripts/smoke.ts",
     "start": "node bin/claude-cost.ts",
     "test": "node --test \"test/*.test.ts\"",
+    "test:coverage": "node --test --experimental-test-coverage \"test/*.test.ts\"",
     "typecheck": "tsc -p tsconfig.json && tsc -p src/dashboard/tsconfig.json"
   },
   "keywords": [
@@ -49,6 +51,8 @@
   },
   "devDependencies": {
     "@types/node": "24.19.2",
+    "oxlint": "1.95.0",
+    "oxlint-tsgolint": "7.0.2008",
     "prettier": "3.10.1",
     "typescript": "7.0.2"
   }

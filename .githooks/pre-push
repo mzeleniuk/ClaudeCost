@@ -11,8 +11,11 @@ npm run --silent format:check
 echo "pre-push: running typecheck"
 npm run --silent typecheck
 
+echo "pre-push: running lint"
+npm run --silent lint
+
 echo "pre-push: running tests"
-npm test --silent
+npm run --silent test:coverage
 
 echo "pre-push: running the compiled CLI"
 npm run --silent smoke

@@ -57,6 +57,7 @@ export const STYLES = [
  * drop only that one.
  */
 export function stripTypes(source: string) {
+  // oxlint-disable-next-line typescript/unbound-method -- called on process below and restored as is
   const emitWarning = process.emitWarning;
 
   process.emitWarning = ((warning: string | Error, ...rest: unknown[]) => {

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Checks formatting of staged files and types of the TypeScript sources.
+# Checks formatting of staged files, types of the TypeScript sources and lint.
 
 set -e
 
@@ -14,3 +14,6 @@ fi
 
 echo "pre-commit: running typecheck"
 npm run --silent typecheck
+
+echo "pre-commit: running lint"
+npm run --silent lint

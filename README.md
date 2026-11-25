@@ -235,8 +235,10 @@ npm ci                 # installs tools and builds through the prepare hook
 npm run typecheck      # strict checking, including tests and the dashboard DOM
 npm run build          # emits JavaScript and source maps into dist/
 npm test               # runs the Node tests on the TypeScript sources
+npm run test:coverage  # runs the tests and prints a coverage report
 npm run smoke          # builds, then runs the compiled CLI and dashboard once
 npm run format:check   # checks source formatting
+npm run lint           # runs oxlint with type-aware rules
 ```
 
 `npm start`, `npm run monthly`, `npm run history` and `npm run dashboard` run the TypeScript entry point directly using Node 24.15+'s built-in type stripping. These commands work without a build or installed development tools. Source dashboard runs strip the types from `src/dashboard/app.ts` and inline the HTML, CSS and icons from that folder, so edits apply on the next run. After a build, `node dist/bin/claude-cost.js` runs without TypeScript or other runtime dependencies.
@@ -251,7 +253,7 @@ The hooks are plain shell scripts in `.githooks`. Git does not use that folder b
 npm run hooks:install   # git config core.hooksPath .githooks
 ```
 
-`pre-commit` checks formatting of the staged files with Prettier and runs `npm run typecheck`. `pre-push` runs `npm run format:check`, `npm run typecheck`, `npm test` and `npm run smoke`. The standalone typecheck includes scripts and the Claude skill wrapper that the test build excludes. To skip a hook once, pass `--no-verify` to `git commit` or `git push`.
+`pre-commit` checks formatting of the staged files with Prettier, then runs `npm run typecheck` and `npm run lint`. `pre-push` runs `npm run format:check`, `npm run typecheck`, `npm run lint`, `npm run test:coverage` and `npm run smoke`. The standalone typecheck includes scripts and the Claude skill wrapper that the test build excludes. To skip a hook once, pass `--no-verify` to `git commit` or `git push`.
 
 ## License
 

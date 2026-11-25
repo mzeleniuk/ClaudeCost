@@ -235,7 +235,7 @@ function loadStore(
 
   if (Number.isInteger(version) && Number(version) > STORE_VERSION) {
     throw new Error(
-      `usage store ${file} was written by a newer claude-cost (format ${version}). Update claude-cost, or pass --no-cache.`,
+      `usage store ${file} was written by a newer claude-cost (format ${Number(version)}). Update claude-cost, or pass --no-cache.`,
     );
   }
 

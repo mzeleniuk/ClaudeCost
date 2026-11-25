@@ -188,10 +188,14 @@ test("archived and live copies of a message are deduped and counted", async (t) 
   fs.rmSync(old);
 
   const events = await dedupeEvents(await s.read());
-  assert.deepEqual(summary(events).sort(), [
-    ["m1", 10],
-    ["m2", 20],
-  ]);
+
+  assert.deepEqual(
+    summary(events).sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+    [
+      ["m1", 10],
+      ["m2", 20],
+    ],
+  );
 
   const result = await aggregate(events, { pricing: {} });
   assert.equal(result.total.messages, 2);

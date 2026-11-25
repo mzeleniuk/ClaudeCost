@@ -579,6 +579,7 @@ test("renderDashboard strips the types from app.ts when run from source", () => 
   assert.ok(fs.existsSync(path.join(dir, "app.ts")));
   assert.ok(!fs.existsSync(path.join(dir, "app.js")), "a source folder has no compiled app.js");
 
+  // oxlint-disable-next-line typescript/unbound-method -- only restored, never called
   const emitWarning = process.emitWarning;
   const warnings: unknown[] = [];
   process.emitWarning = ((warning: unknown) => void warnings.push(warning)) as typeof process.emitWarning;
@@ -591,6 +592,7 @@ test("renderDashboard strips the types from app.ts when run from source", () => 
   }
 
   assert.deepEqual(warnings, [], "the experimental warning is dropped");
+  // oxlint-disable-next-line typescript/unbound-method -- compares the references
   assert.equal(process.emitWarning, emitWarning);
 
   const match = html.match(/<script type="module">([\s\S]*?)<\/script>/);
