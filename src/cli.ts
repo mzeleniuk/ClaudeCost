@@ -2,6 +2,7 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 
 import { aggregate, aggregateByMonth } from "./aggregate.ts";
+import { backupStore } from "./backup.ts";
 import { readEvents } from "./events.ts";
 import { loadPricing, priceForModel } from "./pricing.ts";
 import { loadProfiles } from "./profiles.ts";
@@ -67,6 +68,9 @@ OPTIONS
                       pricing file does not list. The report still prints.
                       Without this flag such a run prints a warning on
                       stderr and exits with status 0.
+  --backup <path>     Copy the usage store into a new claude-cost-backup-<time>
+                      folder inside <path>, then exit. Nothing is overwritten.
+                      Use it on its own, with no other option.
   --no-cache          Read every transcript from disk and leave the usage
                       store alone. Totals miss deleted transcripts.
   --rebuild-cache     Read every transcript on disk again and rewrite the
@@ -82,8 +86,9 @@ USAGE STORE
   Usage read from transcripts is saved in the store, one file per
   transcript directory, so later runs read only new transcript data. Claude
   Code deletes transcripts after cleanupPeriodDays, 30 days by default. Their
-  usage stays in the store and in the totals, so back the store up. It may
-  be the only copy of that history.
+  usage stays in the store and in the totals, so back the store up with
+  --backup. It may be the only copy of that history. To restore, copy the
+  files from a backup folder into the store folder.
 
 PROFILES
   If profiles.config.json exists next to this program, each listed Claude
@@ -104,6 +109,7 @@ EXAMPLES
   claude-cost --since today --json
   claude-cost --dashboard
   claude-cost --dashboard --since 30d --out ~/Desktop/cost.html
+  claude-cost --backup ~/Documents/claude-cost-backups
 `;
 
 // What a scan needs besides the directories to read.
@@ -283,6 +289,7 @@ export async function run(argv: string[]) {
   const { values } = parseArgs({
     args: argv,
     options: {
+      backup: { type: "string" },
       "by-model": { type: "boolean", default: false },
       "by-month": { type: "boolean", default: false },
       dashboard: { type: "boolean", default: false },
@@ -303,6 +310,20 @@ export async function run(argv: string[]) {
 
   if (values.help) {
     console.log(HELP);
+    return 0;
+  }
+
+  if (values.backup != null) {
+    const conflict = Object.entries(values).find(
+      ([flag, value]) => flag !== "backup" && value != null && value !== false,
+    );
+
+    if (conflict) throw new Error(`use either --backup or --${conflict[0]}, not both.`);
+    if (values.backup.trim() === "") throw new Error("--backup needs a folder path.");
+
+    const { dir, files } = backupStore(loadSettings().storeDir, path.resolve(expandHome(values.backup)));
+
+    print(`Backed up ${files.length} usage store ${files.length === 1 ? "file" : "files"} to ${dir}`);
     return 0;
   }
 

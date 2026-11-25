@@ -50,6 +50,14 @@ export function storeFileName(realDir: string) {
 }
 
 /**
+ * True for a file name storeFileName made, or a copy loadStore set aside as
+ * `<name>.corrupt-<time>`. Other files in the store folder are not store files.
+ */
+export function isStoreFileName(name: string) {
+  return /-[0-9a-f]{8}\.json(\.corrupt-[0-9TZ-]+)?$/.test(name);
+}
+
+/**
  * Hash of the bytes just before `offset`. If a file grew and this still
  * matches, the old bytes are in place and only the new ones need reading.
  */

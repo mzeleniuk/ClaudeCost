@@ -302,3 +302,25 @@ test("names --out when the dashboard cannot be written", async () => {
     /cannot write the dashboard to .*d\.html: .*Pass --out <path>/,
   );
 });
+
+test("rejects --backup together with any other option", async () => {
+  for (const flags of [
+    ["--json"],
+    ["--by-month"],
+    ["--dashboard"],
+    ["--since", "7d"],
+    ["--no-cache"],
+    ["--dir", "x"],
+  ]) {
+    await assert.rejects(
+      run(["--backup", "b", ...flags]),
+      new RegExp(`use either --backup or ${flags[0]}, not both`),
+      flags.join(" "),
+    );
+  }
+});
+
+test("rejects an empty --backup", async () => {
+  await assert.rejects(run(["--backup", ""]), /--backup needs a folder path/);
+  await assert.rejects(run(["--backup", "  "]), /--backup needs a folder path/);
+});

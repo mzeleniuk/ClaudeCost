@@ -36,6 +36,7 @@ claude-cost --help
 
 ```bash
 claude-cost                         # all-time total
+claude-cost --backup ~/backups      # copy the usage store to a new folder
 claude-cost --by-model              # per-model breakdown
 claude-cost --by-month              # per-month, per-model history (all time)
 claude-cost --dashboard             # write data/dashboard.html, print its link
@@ -96,6 +97,7 @@ Project names come from the transcript folder names. Claude Code writes `/Users/
 | `--pricing`       | Path to a custom pricing JSON. Overrides per-profile pricing.     |
 | `--region`        | Vertex AI endpoint you call. Overrides every other setting.       |
 | `--strict`        | Exit 1 if a model has no price. See [Pricing](#pricing).          |
+| `--backup`        | Copy the usage store into a new folder in this path, then exit.   |
 | `--no-cache`      | Read transcripts from disk only. See [Usage store](#usage-store). |
 | `--rebuild-cache` | Read every transcript again and rewrite the usage store.          |
 | `-h, --help`      | Show help                                                         |
@@ -175,7 +177,7 @@ Claude Code deletes CLI transcripts after [`cleanupPeriodDays`](https://code.cla
 
 That makes `data/` the only copy of that history, so treat it like data:
 
-- Back it up. `git clean -fdx` deletes it, because it is in `.gitignore`. Plain `git clean -fd` leaves it alone.
+- Back it up with `--backup`, described [below](#back-up-the-store). `git clean -fdx` deletes `data/`, because it is in `.gitignore`. Plain `git clean -fd` leaves it alone.
 - `--rebuild-cache` reads every transcript on disk again but keeps the usage of deleted ones. Use it when you suspect the store is wrong.
 - `--no-cache` ignores the store and does not write it. Totals then cover only the transcripts still on disk.
 - Deleting a file in `data/` is the only way to drop stored history.
@@ -190,6 +192,26 @@ To keep the store somewhere else, set `storeDir` in `settings.config.json`. A re
 ```
 
 To keep CLI transcripts longer in the first place, raise `cleanupPeriodDays` in `~/.claude/settings.json`. The store only has what some run has read. A transcript created and deleted between two runs is lost.
+
+### Back up the store
+
+`--backup <path>` copies the store files into a new folder inside `<path>` and exits. It reads no transcripts, prints no report and cannot be combined with other options.
+
+```bash
+claude-cost --backup ~/Documents/claude-cost-backups
+```
+
+```text
+Backed up 2 usage store files to /Users/me/Documents/claude-cost-backups/claude-cost-backup-2026-11-25T08-44-43-012Z
+```
+
+Each run makes a new `claude-cost-backup-<time>` folder, with the time in UTC, and never overwrites or deletes anything in `<path>`. A fixed folder name would be unsafe. If `data/` is deleted, the next run rebuilds it from the transcripts still on disk, and a backup of that smaller store over the old files would destroy the history the backup exists to keep. Delete old backup folders yourself when you no longer need them.
+
+The copy holds the store as the last run that read transcripts left it. Run `claude-cost` first if the backup should include today's transcripts. It includes any `*.corrupt-<time>` files, which can hold history that exists nowhere else. It leaves out `dashboard.html`.
+
+`<path>` must be outside the store folder, because deleting the store would delete a backup inside it. Pick a folder on another disk or in a synced folder, so one failure does not take both copies.
+
+To restore, copy the files from a backup folder into the store folder, which is `data/` unless you set `storeDir`. Usage from deleted transcripts counts again in the next report.
 
 ## Use from any Claude session
 
