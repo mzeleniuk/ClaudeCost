@@ -4,7 +4,7 @@ import { EMPTY_LINE, INDENT, archiveLines, headingLines, noteLines, scopeLine, w
 import type { MonthlyResult, ReportOptions } from "../types.ts";
 
 // "2025-01" as "January 2025".
-function monthName(key: string) {
+export function monthName(key: string) {
   const [year, month] = key.split("-").map(Number);
 
   return new Date(year, month - 1).toLocaleString("en-US", {

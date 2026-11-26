@@ -1,7 +1,8 @@
 import { sortedMonths } from "../aggregate.ts";
+import { budgetJson } from "./budget.ts";
 import { formatJson, roundCost } from "./format.ts";
 import { skippedLines } from "./skipped.ts";
-import type { MonthlyResult, Totals } from "../types.ts";
+import type { BudgetReport, MonthlyResult, Totals } from "../types.ts";
 
 // Monthly totals for one scan, without the report envelope.
 export function buildMonthlyProfile({
@@ -34,10 +35,14 @@ export function buildMonthlyProfile({
 }
 
 // JSON report for `aggregateByMonth` results.
-export function renderMonthlyJson(result: MonthlyResult, { since, region }: { since: Date | null; region?: string }) {
+export function renderMonthlyJson(
+  result: MonthlyResult,
+  { budget, since, region }: { budget?: BudgetReport | null; since: Date | null; region?: string },
+) {
   const profile = buildMonthlyProfile(result);
 
   return formatJson({
+    ...(budget && { budget: budgetJson(budget) }),
     archivedTranscripts: profile.archivedTranscripts,
     byMonth: profile.byMonth,
     generatedAt: new Date().toISOString(),

@@ -3,17 +3,19 @@ import { parseArgs } from "node:util";
 
 import { aggregate, aggregateByMonth } from "./aggregate.ts";
 import { backupStore } from "./backup.ts";
+import { buildBudget, parseBudget } from "./budget.ts";
 import { readEvents } from "./events.ts";
 import { emptyParseStats } from "./parse.ts";
 import { loadPricing, priceForModel } from "./pricing.ts";
 import { loadProfiles } from "./profiles.ts";
 import { REGIONS, validateRegion } from "./regions.ts";
 import { loadSettings } from "./settings.ts";
-import { parseSince, startOfMonth } from "./since.ts";
+import { monthKey, parseSince, startOfMonth } from "./since.ts";
 import { expandHome, resolveTranscriptDirs } from "./config.ts";
 import { collectDashboard } from "./dashboard/collect.ts";
 import { fileLink, summarizeDashboard, summarizeTokens, writeDashboardFile } from "./dashboard/output.ts";
 import { renderDashboard } from "./dashboard/render.ts";
+import { budgetLines, overBudgetMessages, paceMessages } from "./report/budget.ts";
 import { renderJson } from "./report/json.ts";
 import { renderMonthlyJson } from "./report/monthlyJson.ts";
 import { renderMonthlyTable } from "./report/monthlyTable.ts";
@@ -28,7 +30,15 @@ import type { DashboardSource } from "./dashboard/collect.ts";
 import type { StoreMode } from "./events.ts";
 import type { ProfileReport } from "./report/profiles.ts";
 import type { Unpriced } from "./report/unpriced.ts";
-import type { AggregateResult, MonthlyResult, ParseStats, PricingSummary, PricingTable, Profile } from "./types.ts";
+import type {
+  AggregateResult,
+  BudgetReport,
+  MonthlyResult,
+  ParseStats,
+  PricingSummary,
+  PricingTable,
+  Profile,
+} from "./types.ts";
 
 // How reports name the bundled pricing file.
 const DEFAULT_PRICING_NAME = "pricing.config.json";
@@ -66,9 +76,18 @@ OPTIONS
                       cost 10% more. Overrides the region in
                       settings.config.json and in profiles.
                       ${REGIONS.join(", ")}
+  --budget <usd>      Warn on stderr when this month's spend passes <usd>.
+                      The month is the current calendar month in local time,
+                      whatever --since says. Overrides "budget" in
+                      settings.config.json. With --strict the run exits with
+                      status 1 instead of only warning.
+  --forecast          Project this month's spend to the end of the month from
+                      the pace so far. It needs one full day of the month.
+                      With a budget, it warns when the projection passes it.
   --strict            Exit with status 1 when usage comes from a model the
-                      pricing file does not list, or when transcript lines
-                      with usage could not be read. The report still prints.
+                      pricing file does not list, when transcript lines with
+                      usage could not be read, or when this month's spend
+                      passes the budget. The report still prints.
                       Without this flag such a run prints a warning on
                       stderr and exits with status 0.
   --backup <path>     Copy the usage store into a new claude-cost-backup-<time>
@@ -83,7 +102,8 @@ OPTIONS
 SETTINGS
   settings.config.json next to this program sets defaults. Copy
   settings.config.example.json to get started. "region" defaults to global.
-  "storeDir" defaults to the data folder next to this program.
+  "storeDir" defaults to the data folder next to this program. "budget" is a
+  monthly limit in USD and is off unless set.
 
 USAGE STORE
   Usage read from transcripts is saved in the store, one file per
@@ -106,6 +126,8 @@ EXAMPLES
   claude-cost --by-month --since 2025-01-01 --json
   claude-cost --dir ~/.claude/projects --pricing ./my-prices.json
   claude-cost --strict --json > usage.json
+  claude-cost --budget 200 --forecast
+  claude-cost --budget 200 --strict --since 7d
   claude-cost --region us --by-model
   claude-cost --monthly --by-model
   claude-cost --since 7d --by-model
@@ -158,18 +180,31 @@ interface Origin {
 
 function renderUsage(
   result: AggregateResult,
-  { byModel, since, region, pricingFile, json }: Origin & { byModel: boolean; since: Date | null; json: boolean },
+  {
+    byModel,
+    since,
+    region,
+    pricingFile,
+    json,
+    budget,
+  }: Origin & { byModel: boolean; since: Date | null; json: boolean; budget: BudgetReport | null },
 ) {
   const opts = { byModel, since, region, pricingFile };
-  return json ? renderJson(result, opts) : renderTable(result, opts);
+  return json ? renderJson(result, { ...opts, budget }) : renderTable(result, opts);
 }
 
 function renderMonthly(
   result: MonthlyResult,
-  { since, region, pricingFile, json }: Origin & { since: Date | null; json: boolean },
+  {
+    since,
+    region,
+    pricingFile,
+    json,
+    budget,
+  }: Origin & { since: Date | null; json: boolean; budget: BudgetReport | null },
 ) {
   const opts = { since, region, pricingFile };
-  return json ? renderMonthlyJson(result, opts) : renderMonthlyTable(result, opts);
+  return json ? renderMonthlyJson(result, { ...opts, budget }) : renderMonthlyTable(result, opts);
 }
 
 /**
@@ -195,6 +230,50 @@ function resolveSource({
     pricingFile: pricingPath ?? DEFAULT_PRICING_NAME,
     pricing: loadPricing(pricingPath, region),
   };
+}
+
+/**
+ * The current month's spend across every profile, or across the directories
+ * --dir names, for --budget and --forecast. It reads the month whatever
+ * --since says, and it prices each profile with its own pricing file and region.
+ */
+async function collectBudget(
+  {
+    profiles,
+    dir,
+    ...sourceFlags
+  }: {
+    profiles: Profile[] | null;
+    dir: string | undefined;
+    pricingFlag: string | undefined;
+    regionFlag: string | null;
+    settings: { region: string };
+  },
+  {
+    limit,
+    forecast,
+    store,
+    now = new Date(),
+  }: { limit: number | null; forecast: boolean; store: StoreMode; now?: Date },
+): Promise<BudgetReport> {
+  const since = startOfMonth(now);
+  const key = monthKey(now);
+
+  const sources = profiles
+    ? profiles.map((profile) => ({
+        dirs: [profile.projectsDir],
+        pricing: resolveSource({ profile, ...sourceFlags }).pricing,
+      }))
+    : [{ dirs: resolveTranscriptDirs(dir), pricing: resolveSource({ profile: null, ...sourceFlags }).pricing }];
+
+  let spentUSD = 0;
+
+  for (const { dirs, pricing } of sources) {
+    const { months } = await collectMonthly(dirs, { pricing, since, store });
+    spentUSD += (key && months.get(key)?.total.costUSD) || 0;
+  }
+
+  return buildBudget({ spentUSD, limitUSD: limit, forecast, now });
 }
 
 /**
@@ -281,16 +360,22 @@ function unpricedOf({ pricingFile, result }: { pricingFile: string; result: Pric
 }
 
 /**
- * Warn on stderr about models priced at $0 and transcript lines that could
- * not be read. Returns the exit status: 1 when `strict` is set and there is
- * either, otherwise 0.
+ * Warn on stderr about models priced at $0, transcript lines that could not
+ * be read and a month's spend over the budget. Returns the exit status: 1
+ * when `strict` is set and there is any of the three, otherwise 0. A forecast
+ * above the budget only warns, because the budget is not exceeded yet.
  */
-function reportWarnings(entries: Unpriced[], scans: ParseStats[], strict: boolean) {
+function reportWarnings(entries: Unpriced[], scans: ParseStats[], strict: boolean, budget: BudgetReport | null) {
   const skipped = skippedMessage(scans, { strict });
-  const lines = [...unpricedMessages(entries, { strict }), ...(skipped ? [skipped] : [])];
 
-  for (const line of lines) console.error(line);
-  return strict && lines.length ? 1 : 0;
+  const problems = [
+    ...unpricedMessages(entries, { strict }),
+    ...(skipped ? [skipped] : []),
+    ...overBudgetMessages(budget, { strict }),
+  ];
+
+  for (const line of [...problems, ...paceMessages(budget)]) console.error(line);
+  return strict && problems.length ? 1 : 0;
 }
 
 export async function run(argv: string[]) {
@@ -298,10 +383,12 @@ export async function run(argv: string[]) {
     args: argv,
     options: {
       backup: { type: "string" },
+      budget: { type: "string" },
       "by-model": { type: "boolean", default: false },
       "by-month": { type: "boolean", default: false },
       dashboard: { type: "boolean", default: false },
       dir: { type: "string" },
+      forecast: { type: "boolean", default: false },
       help: { type: "boolean", short: "h", default: false },
       json: { type: "boolean", default: false },
       monthly: { type: "boolean", default: false },
@@ -373,12 +460,32 @@ export async function run(argv: string[]) {
   const byMonth = values["by-month"];
   const since = values.monthly ? startOfMonth() : parseSince(values.since);
   const regionFlag = values.region != null ? validateRegion(values.region, "--region") : null;
+  const limit = values.budget != null ? parseBudget(values.budget, "--budget") : null;
   const settings = loadSettings();
   const profiles = values.dir ? null : loadProfiles();
 
   const store: StoreMode = {
     storeDir: values["no-cache"] ? null : settings.storeDir,
     rebuild: values["rebuild-cache"],
+  };
+
+  // The flag beats the setting. The month is read before the report, so JSON can carry it.
+  const budgetLimit = limit ?? settings.budget;
+
+  const budget =
+    budgetLimit != null || values.forecast
+      ? await collectBudget(
+          { profiles, dir: values.dir, pricingFlag: values.pricing, regionFlag, settings },
+          { limit: budgetLimit, forecast: values.forecast, store },
+        )
+      : null;
+
+  // That read rewrote the store when --rebuild-cache asked for it, so the report reads it as it is.
+  const reportStore: StoreMode = budget ? { ...store, rebuild: false } : store;
+
+  // A text report is followed by the budget block. A JSON report has it inside.
+  const printBudget = () => {
+    if (budget && !values.json) print(budgetLines(budget).join("\n"));
   };
 
   if (values.dashboard) {
@@ -388,7 +495,7 @@ export async function run(argv: string[]) {
       regionFlag,
       settings,
       since,
-      store,
+      store: reportStore,
     });
 
     const file = values.out
@@ -412,14 +519,15 @@ export async function run(argv: string[]) {
     const tokens = summarizeTokens(data);
     if (tokens) print(dim(tokens));
 
-    return reportWarnings(unpriced, [parse], values.strict);
+    printBudget();
+    return reportWarnings(unpriced, [parse], values.strict, budget);
   }
 
   const sourceFlags = { pricingFlag: values.pricing, regionFlag, settings };
-  const scanOf = (pricing: PricingTable): Scan => ({ pricing, since, store });
+  const scanOf = (pricing: PricingTable): Scan => ({ pricing, since, store: reportStore });
 
   if (profiles) {
-    const options = { since, json: values.json };
+    const options = { since, json: values.json, budget };
 
     if (byMonth) {
       const reports = await collectProfileReports(profiles, sourceFlags, (dirs, pricing) =>
@@ -427,11 +535,13 @@ export async function run(argv: string[]) {
       );
 
       print(renderProfileReports({ byMonth: true, reports }, options));
+      printBudget();
 
       return reportWarnings(
         reports.map(unpricedOf),
         reports.map((report) => report.result.parse),
         values.strict,
+        budget,
       );
     }
 
@@ -440,27 +550,33 @@ export async function run(argv: string[]) {
     );
 
     print(renderProfileReports({ byMonth: false, byModel, reports }, options));
+    printBudget();
 
     return reportWarnings(
       reports.map(unpricedOf),
       reports.map((report) => report.result.parse),
       values.strict,
+      budget,
     );
   }
 
   const { region, pricingFile, pricing } = resolveSource({ profile: null, ...sourceFlags });
   const dirs = resolveTranscriptDirs(values.dir);
-  const origin = { region, pricingFile, since, json: values.json };
+  const origin = { region, pricingFile, since, json: values.json, budget };
 
   if (byMonth) {
     const result = await collectMonthly(dirs, scanOf(pricing));
 
     print(renderMonthly(result, origin));
-    return reportWarnings([unpricedOf({ pricingFile, result })], [result.parse], values.strict);
+    printBudget();
+
+    return reportWarnings([unpricedOf({ pricingFile, result })], [result.parse], values.strict, budget);
   }
 
   const result = await collectUsage(dirs, scanOf(pricing), byModel);
 
   print(renderUsage(result, { ...origin, byModel }));
-  return reportWarnings([unpricedOf({ pricingFile, result })], [result.parse], values.strict);
+  printBudget();
+
+  return reportWarnings([unpricedOf({ pricingFile, result })], [result.parse], values.strict, budget);
 }

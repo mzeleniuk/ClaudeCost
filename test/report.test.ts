@@ -211,6 +211,18 @@ test("renderProfileReports adds an all-profiles total", () => {
     ],
   );
   assert.equal(json.total.costUSD, 3);
+  assert.equal("budget" in json, false);
+
+  const budget = { month: "2025-01", spentUSD: 3, limitUSD: 2, forecast: null };
+  const withBudget = JSON.parse(renderProfileReports(input, { since: null, json: true, budget }));
+
+  assert.deepEqual(withBudget.budget, {
+    month: "2025-01",
+    spentUSD: 3,
+    budgetUSD: 2,
+    overBudget: true,
+    forecast: null,
+  });
 });
 
 test("renderProfileReports prints monthly sections and sums skipped messages", () => {
@@ -244,4 +256,11 @@ test("renderProfileReports prints monthly sections and sums skipped messages", (
   assert.equal(json.groupedBy, "month-model");
   assert.equal(json.skippedUndated, 5);
   assert.equal(json.total.costUSD, 3);
+  assert.equal("budget" in json, false);
+
+  const budget = { month: "2025-01", spentUSD: 3, limitUSD: null, forecast: { projectedUSD: 6 } };
+  const withBudget = JSON.parse(renderProfileReports(input, { since: null, json: true, budget }));
+
+  assert.equal(withBudget.budget.forecast.projectedUSD, 6);
+  assert.equal(withBudget.budget.budgetUSD, null);
 });

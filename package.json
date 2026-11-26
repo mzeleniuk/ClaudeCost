@@ -1,6 +1,6 @@
 {
   "name": "claude-cost",
-  "version": "0.10.2",
+  "version": "0.11.0",
   "private": true,
   "description": "Approximate local cost tracking for Claude Code by parsing session transcripts.",
   "type": "module",

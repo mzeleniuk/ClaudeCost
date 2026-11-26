@@ -37,10 +37,12 @@ claude-cost --help
 ```bash
 claude-cost                         # all-time total
 claude-cost --backup ~/backups      # copy the usage store to a new folder
+claude-cost --budget 200            # warn when this month's spend passes $200
 claude-cost --by-model              # per-model breakdown
 claude-cost --by-month              # per-month, per-model history (all time)
 claude-cost --dashboard             # write data/dashboard.html, print its link
 claude-cost --dir ~/.claude/projects
+claude-cost --forecast              # project this month's total from the pace so far
 claude-cost --json                  # machine-readable output
 claude-cost --monthly               # since start of current month
 claude-cost --pricing ./my-prices.json
@@ -96,7 +98,9 @@ Project names come from the transcript folder names. Claude Code writes `/Users/
 | `--dir`           | Override transcript directory. Ignores `profiles.config.json`.    |
 | `--pricing`       | Path to a custom pricing JSON. Overrides per-profile pricing.     |
 | `--region`        | Vertex AI endpoint you call. Overrides every other setting.       |
-| `--strict`        | Exit 1 on an unpriced model or an unreadable line. See below.     |
+| `--budget`        | Warn when this month's spend passes this many USD. See below.     |
+| `--forecast`      | Project this month's spend to the end of the month. See below.    |
+| `--strict`        | Exit 1 on unpriced models, unreadable lines or a passed budget.   |
 | `--backup`        | Copy the usage store into a new folder in this path, then exit.   |
 | `--no-cache`      | Read transcripts from disk only. See [Usage store](#usage-store). |
 | `--rebuild-cache` | Read every transcript again and rewrite the usage store.          |
@@ -168,6 +172,57 @@ claude-cost: warning: models missing from pricing.config.json are priced at $0: 
 ```bash
 claude-cost --strict --json > usage.json || echo "update pricing.config.json"
 ```
+
+## Budget and forecast
+
+`--budget <usd>` warns when this month's spend passes a limit. The month is the current calendar month in local time. The check reads that month whatever `--since`, `--monthly` or `--by-month` say. It adds up every profile, and prices each one with its own pricing file and region.
+
+```bash
+claude-cost --budget 200
+claude-cost --budget 200 --strict || echo "over budget"
+```
+
+To set a limit for every run, add `budget` to `settings.config.json`. It is a number of USD above zero, and `--budget` overrides it:
+
+```json
+{ "budget": 200 }
+```
+
+A text report ends with a block for the month, and a `--json` report gets a `budget` key:
+
+```text
+⏺ November 2026
+  ⎿  Spent     $152.07 of $200.00 budget (76%)
+     Forecast  $177.89 at the current pace
+```
+
+```json
+"budget": {
+  "month": "2026-11",
+  "spentUSD": 152.069579,
+  "budgetUSD": 200,
+  "overBudget": false,
+  "forecast": { "projectedUSD": 177.892828, "overBudget": false }
+}
+```
+
+`budgetUSD` is null when only `--forecast` was given, and `forecast` is null when `--forecast` was not.
+
+When spend passes the budget, the run prints a warning on stderr and exits with status 0. Spend equal to the budget does not pass it. With `--strict` the same line is an error and the exit status is 1, after the report prints.
+
+```text
+claude-cost: warning: November 2026 spend $152.07 is $52.07 over the $100.00 budget.
+```
+
+`--forecast` divides the month's spend by the share of the month that has passed, so $50 after 14 of 28 days projects to $100. It assumes the rest of the month costs the same per day as the days so far, so a few heavy days early in the month push it up. It is not available during the first day of the month, because a few hours of use say little about the month. The text block says so, and `projectedUSD` is null.
+
+With a budget, a forecast above it prints a warning on stderr. `--strict` does not turn that into exit status 1, because spend has not passed the budget yet.
+
+```text
+claude-cost: warning: November 2026 is on pace for $177.92, $17.92 over the $160.00 budget.
+```
+
+The month is a second scan next to the report, which the usage store keeps fast. With `--no-cache` the run reads every transcript twice.
 
 ## Unreadable transcript lines
 

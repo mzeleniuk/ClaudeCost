@@ -135,6 +135,19 @@ export interface MonthTotals {
 // Result of `aggregateByMonth`. `months` is keyed by local "YYYY-MM".
 export type MonthlyResult = PricingSummary & { months: Map<string, MonthTotals>; skippedUndated: number };
 
+/**
+ * This month's spend for --budget and --forecast. `month` is a local
+ * "YYYY-MM" key. `limitUSD` is null when only --forecast was given.
+ * `forecast` is null unless --forecast was given, and its `projectedUSD` is
+ * null during the first day of the month, when the run rate says too little.
+ */
+export interface BudgetReport {
+  forecast: { projectedUSD: number | null } | null;
+  limitUSD: number | null;
+  month: string;
+  spentUSD: number;
+}
+
 export interface Profile {
   name: string;
   dir: string;

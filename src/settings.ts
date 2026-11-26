@@ -9,15 +9,20 @@ import { readJsonObject } from "./validate.ts";
 
 // Local settings. Sits next to pricing.config.json and is not committed.
 const DEFAULT_SETTINGS_PATH = path.join(PROJECT_ROOT, "settings.config.json");
-const KNOWN_KEYS = new Set(["region", "storeDir"]);
+const KNOWN_KEYS = new Set(["budget", "region", "storeDir"]);
 
 /**
  * Load global settings. A missing file means defaults.
  * Keys starting with "_" are comments and are ignored.
  * A relative `storeDir` is resolved against the settings file's directory.
+ * `budget` is a monthly limit in USD, and null when it is not set.
  */
-export function loadSettings(filePath: string = DEFAULT_SETTINGS_PATH): { region: string; storeDir: string } {
-  const settings = { region: DEFAULT_REGION, storeDir: DEFAULT_STORE_DIR };
+export function loadSettings(filePath: string = DEFAULT_SETTINGS_PATH): {
+  budget: number | null;
+  region: string;
+  storeDir: string;
+} {
+  const settings = { budget: null as number | null, region: DEFAULT_REGION, storeDir: DEFAULT_STORE_DIR };
   if (!fs.existsSync(filePath)) return settings;
 
   const parsed = readJsonObject(filePath, "settings");
@@ -26,6 +31,14 @@ export function loadSettings(filePath: string = DEFAULT_SETTINGS_PATH): { region
     if (!key.startsWith("_") && !KNOWN_KEYS.has(key)) {
       throw new Error(`unknown setting "${key}" in ${filePath}`);
     }
+  }
+
+  if (parsed.budget !== undefined) {
+    if (typeof parsed.budget !== "number" || !Number.isFinite(parsed.budget) || parsed.budget <= 0) {
+      throw new Error(`invalid budget in ${filePath}: expected a number above zero`);
+    }
+
+    settings.budget = parsed.budget;
   }
 
   if (parsed.region !== undefined) {

@@ -1,10 +1,11 @@
 import { sumTotals } from "../totals.ts";
+import { budgetJson } from "./budget.ts";
 import { COST_COLUMNS, formatJson, renderGrid, roundCost } from "./format.ts";
 import { buildUsageProfile } from "./json.ts";
 import { buildMonthlyProfile } from "./monthlyJson.ts";
 import { renderMonthlyTable } from "./monthlyTable.ts";
 import { INDENT, headingLines, noteLines, renderTable } from "./table.ts";
-import type { AggregateResult, MonthlyResult, Profile, PricingSummary } from "../types.ts";
+import type { AggregateResult, BudgetReport, MonthlyResult, Profile, PricingSummary } from "../types.ts";
 
 // One profile's scan, ready to print.
 export interface ProfileReport<R extends PricingSummary> {
@@ -20,9 +21,10 @@ function profilesTotal(reports: ProfileReport<PricingSummary>[]) {
 
 function buildProfilesUsage(
   reports: ProfileReport<AggregateResult>[],
-  { byModel, since }: { byModel: boolean; since: Date | null },
+  { budget, byModel, since }: { budget?: BudgetReport | null; byModel: boolean; since: Date | null },
 ) {
   return {
+    ...(budget && { budget: budgetJson(budget) }),
     generatedAt: new Date().toISOString(),
     since: since ? since.toISOString() : null,
     groupedBy: byModel ? "model" : "none",
@@ -36,8 +38,12 @@ function buildProfilesUsage(
   };
 }
 
-function buildProfilesMonthly(reports: ProfileReport<MonthlyResult>[], since: Date | null) {
+function buildProfilesMonthly(
+  reports: ProfileReport<MonthlyResult>[],
+  { budget, since }: { budget?: BudgetReport | null; since: Date | null },
+) {
   return {
+    ...(budget && { budget: budgetJson(budget) }),
     generatedAt: new Date().toISOString(),
     groupedBy: "month-model",
     since: since ? since.toISOString() : null,
@@ -64,14 +70,17 @@ export type ProfileReports =
  * One section per profile, then a total across all of them.
  * The reconciliation note is printed once, after the grand total.
  */
-export function renderProfileReports(input: ProfileReports, { since, json }: { since: Date | null; json: boolean }) {
+export function renderProfileReports(
+  input: ProfileReports,
+  { since, json, budget }: { since: Date | null; json: boolean; budget?: BudgetReport | null },
+) {
   const { reports } = input;
 
   if (json) {
     return formatJson(
       input.byMonth
-        ? buildProfilesMonthly(input.reports, since)
-        : buildProfilesUsage(input.reports, { byModel: input.byModel, since }),
+        ? buildProfilesMonthly(input.reports, { budget, since })
+        : buildProfilesUsage(input.reports, { budget, byModel: input.byModel, since }),
     );
   }
 

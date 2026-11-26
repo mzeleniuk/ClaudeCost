@@ -308,6 +308,8 @@ test("rejects --backup together with any other option", async () => {
     ["--json"],
     ["--by-month"],
     ["--dashboard"],
+    ["--budget", "5"],
+    ["--forecast"],
     ["--since", "7d"],
     ["--no-cache"],
     ["--dir", "x"],
