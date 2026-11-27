@@ -20,10 +20,13 @@ const compact = new Intl.NumberFormat("en-US", {
 // Token count as 950, 2.5k, 88.1M.
 export const fmtTokens = (n: number) => compact.format(n).replace("K", "k");
 
+// A cost rounded for JSON output.
+export const roundUSD = (n: number) => Number(n.toFixed(6));
+
 // Copy of a totals object with cost rounded for JSON output.
 export const roundCost = (totals: Totals): Totals => ({
   ...totals,
-  costUSD: Number(totals.costUSD.toFixed(6)),
+  costUSD: roundUSD(totals.costUSD),
 });
 
 export interface Column {

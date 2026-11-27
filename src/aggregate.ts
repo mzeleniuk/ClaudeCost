@@ -29,13 +29,19 @@ function getOrInit<K, V>(map: Map<K, V>, key: K, init: () => V): V {
 }
 
 /**
- * Price every event at or after `since` and add it to the grand total and to
- * the buckets `bucketsFor` returns. Events without a timestamp are excluded
- * when `since` is set. When `bucketsFor` returns null the event is skipped.
+ * Price every event at or after `since` and before `until`, and add it to the
+ * grand total and to the buckets `bucketsFor` returns. Events without a
+ * timestamp are excluded when either bound is set. When `bucketsFor` returns
+ * null the event is skipped.
  */
 async function sumEvents(
   events: Events,
-  { pricing, since, parse }: { pricing: PricingTable; since: Date | null; parse: ParseStats },
+  {
+    pricing,
+    since,
+    until,
+    parse,
+  }: { pricing: PricingTable; since: Date | null; until: Date | null; parse: ParseStats },
   bucketsFor: (event: UsageEvent) => Totals[] | null,
 ): Promise<PricingSummary> {
   const archived = new Set<string>();
@@ -45,6 +51,7 @@ async function sumEvents(
 
   for await (const event of events) {
     if (since && (!event.ts || event.ts < since)) continue;
+    if (until && (!event.ts || event.ts >= until)) continue;
 
     const buckets = bucketsFor(event);
     if (!buckets) continue;
@@ -76,12 +83,13 @@ export async function aggregate(
   {
     pricing,
     since = null,
+    until = null,
     byModel = false,
     parse = emptyParseStats(),
-  }: { pricing: PricingTable; since?: Date | null; byModel?: boolean; parse?: ParseStats },
+  }: { pricing: PricingTable; since?: Date | null; until?: Date | null; byModel?: boolean; parse?: ParseStats },
 ): Promise<AggregateResult> {
   const groups: Map<string, Totals> = new Map();
-  const summary = await sumEvents(events, { pricing, since, parse }, (event) =>
+  const summary = await sumEvents(events, { pricing, since, until, parse }, (event) =>
     byModel ? [getOrInit(groups, event.model, emptyTotals)] : [],
   );
 
@@ -104,7 +112,7 @@ export async function aggregateByMonth(
   const months: Map<string, MonthTotals> = new Map();
   let skippedUndated = 0;
 
-  const summary = await sumEvents(events, { pricing, since, parse }, (event) => {
+  const summary = await sumEvents(events, { pricing, since, until: null, parse }, (event) => {
     const key = monthKey(event.ts);
 
     if (!key) {

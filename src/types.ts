@@ -148,6 +148,31 @@ export interface BudgetReport {
   spentUSD: number;
 }
 
+// A stretch of time. `since` is inclusive and `until` is exclusive.
+export interface Period {
+  since: Date;
+  until: Date;
+}
+
+/**
+ * Usage in one period. `groups` is keyed by model and is empty unless the
+ * report was grouped by model.
+ */
+export interface PeriodUsage extends Period {
+  groups: Map<string, Totals>;
+  total: Totals;
+}
+
+/**
+ * --compare previous: the report's period and the period before it. `current`
+ * ends when the run started.
+ */
+export interface CompareReport {
+  byModel: boolean;
+  current: PeriodUsage;
+  previous: PeriodUsage;
+}
+
 export interface Profile {
   name: string;
   dir: string;

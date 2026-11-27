@@ -1,7 +1,8 @@
 import { budgetJson } from "./budget.ts";
+import { compareJson } from "./compare.ts";
 import { formatJson, roundCost } from "./format.ts";
 import { skippedLines } from "./skipped.ts";
-import type { AggregateResult, BudgetReport } from "../types.ts";
+import type { AggregateResult, BudgetReport, CompareReport } from "../types.ts";
 
 // Totals for one scan, without the report envelope.
 export function buildUsageProfile(
@@ -25,15 +26,23 @@ export function renderJson(
   result: AggregateResult,
   {
     budget,
+    compare,
     byModel,
     since,
     region,
-  }: { budget?: BudgetReport | null; byModel: boolean; since: Date | null; region?: string },
+  }: {
+    budget?: BudgetReport | null;
+    compare?: CompareReport | null;
+    byModel: boolean;
+    since: Date | null;
+    region?: string;
+  },
 ) {
   const profile = buildUsageProfile(result, { byModel });
 
   return formatJson({
     ...(budget && { budget: budgetJson(budget) }),
+    ...(compare && { compare: compareJson(compare) }),
     archivedTranscripts: profile.archivedTranscripts,
     generatedAt: new Date().toISOString(),
     groupedBy: byModel ? "model" : "none",

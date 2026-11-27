@@ -165,6 +165,37 @@ test("excludes undated events when --since is set", async () => {
   assert.equal(total.inputTokens, 1_000_000);
 });
 
+test("--until leaves out events at and after it, and events without a timestamp", async () => {
+  const input = (n: number) => ({ cacheRead: 0, cacheWrite: 0, hasCacheBreakdown: false, input: n, output: 0 });
+
+  const events = mockEvents([
+    { ts: new Date("2025-01-09"), model: "claude-sonnet-4", usage: input(1_000_000) },
+    { ts: new Date("2025-01-10"), model: "claude-sonnet-4", usage: input(2_000_000) },
+    { ts: new Date("2025-01-11"), model: "claude-sonnet-4", usage: input(4_000_000) },
+    { ts: null, model: "claude-sonnet-4", usage: input(8_000_000) },
+  ]);
+
+  const { total } = await aggregate(events, {
+    pricing: PRICING,
+    since: new Date("2025-01-09"),
+    until: new Date("2025-01-11"),
+  });
+
+  // The first two events are in [since, until).
+  assert.equal(total.messages, 2);
+  assert.equal(total.inputTokens, 3_000_000);
+
+  const { total: untilOnly } = await aggregate(
+    mockEvents([
+      { ts: new Date("2025-01-09"), model: "claude-sonnet-4", usage: input(1_000_000) },
+      { ts: null, model: "claude-sonnet-4", usage: input(8_000_000) },
+    ]),
+    { pricing: PRICING, until: new Date("2025-01-11") },
+  );
+
+  assert.equal(untilOnly.messages, 1);
+});
+
 test("sums normalized cacheWrite tokens from breakdown", async () => {
   const events = mockEvents([
     {

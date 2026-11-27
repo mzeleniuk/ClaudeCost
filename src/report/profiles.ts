@@ -1,11 +1,12 @@
 import { sumTotals } from "../totals.ts";
 import { budgetJson } from "./budget.ts";
+import { compareJson } from "./compare.ts";
 import { COST_COLUMNS, formatJson, renderGrid, roundCost } from "./format.ts";
 import { buildUsageProfile } from "./json.ts";
 import { buildMonthlyProfile } from "./monthlyJson.ts";
 import { renderMonthlyTable } from "./monthlyTable.ts";
 import { INDENT, headingLines, noteLines, renderTable } from "./table.ts";
-import type { AggregateResult, BudgetReport, MonthlyResult, Profile, PricingSummary } from "../types.ts";
+import type { AggregateResult, BudgetReport, CompareReport, MonthlyResult, Profile, PricingSummary } from "../types.ts";
 
 // One profile's scan, ready to print.
 export interface ProfileReport<R extends PricingSummary> {
@@ -21,10 +22,16 @@ function profilesTotal(reports: ProfileReport<PricingSummary>[]) {
 
 function buildProfilesUsage(
   reports: ProfileReport<AggregateResult>[],
-  { budget, byModel, since }: { budget?: BudgetReport | null; byModel: boolean; since: Date | null },
+  {
+    budget,
+    compare,
+    byModel,
+    since,
+  }: { budget?: BudgetReport | null; compare?: CompareReport | null; byModel: boolean; since: Date | null },
 ) {
   return {
     ...(budget && { budget: budgetJson(budget) }),
+    ...(compare && { compare: compareJson(compare) }),
     generatedAt: new Date().toISOString(),
     since: since ? since.toISOString() : null,
     groupedBy: byModel ? "model" : "none",
@@ -72,7 +79,12 @@ export type ProfileReports =
  */
 export function renderProfileReports(
   input: ProfileReports,
-  { since, json, budget }: { since: Date | null; json: boolean; budget?: BudgetReport | null },
+  {
+    since,
+    json,
+    budget,
+    compare,
+  }: { since: Date | null; json: boolean; budget?: BudgetReport | null; compare?: CompareReport | null },
 ) {
   const { reports } = input;
 
@@ -80,7 +92,7 @@ export function renderProfileReports(
     return formatJson(
       input.byMonth
         ? buildProfilesMonthly(input.reports, { budget, since })
-        : buildProfilesUsage(input.reports, { budget, byModel: input.byModel, since }),
+        : buildProfilesUsage(input.reports, { budget, compare, byModel: input.byModel, since }),
     );
   }
 

@@ -40,10 +40,22 @@ class Element {
   setAttribute() {}
 }
 
-function loadApp(data: DashboardData) {
+function loadApp(data: DashboardData, hash = "") {
   const host = new Element();
+  const location = { hash, pathname: "/dashboard.html", search: "" };
+
+  // Like the browser, replaceState changes the hash without a hashchange event.
+  const history = {
+    replaceState: (_state: unknown, _title: string, url: string) => {
+      location.hash = url.includes("#") ? url.slice(url.indexOf("#")) : "";
+    },
+  };
+
   const context = vm.createContext({
     Intl,
+    URLSearchParams,
+    location,
+    history,
     document: {
       getElementById: (id: string) => (id === "claude-cost-data" ? { textContent: JSON.stringify(data) } : host),
       createElement: () => new Element(),
@@ -53,6 +65,7 @@ function loadApp(data: DashboardData) {
   vm.runInContext(`${calculations}\n${kpis}\n${scales}`, context);
   return {
     evaluate: (expression: string) => vm.runInContext(expression, context),
+    hash: () => location.hash,
     renderKpis: () => {
       vm.runInContext("computeView(); renderKpis();", context);
       return host.children.map((cell) => ({
@@ -392,3 +405,108 @@ for (const { range, days, midnightOffset } of [
     }
   });
 }
+
+// Usage 60 days back, 30 days back and on the generation day, so the last 30
+// days and the 30 before them both have spend.
+const recent = () =>
+  dashboard(null, undefined, {
+    now: new Date(2026, 2, 13, 23, 30),
+    dates: [new Date(2026, 2, 14 - 60, 12), new Date(2026, 2, 14 - 30, 12), new Date(2026, 2, 13, 12)],
+  });
+
+// Usage only 90 and 100 days back, so the last 30 days are empty.
+const stale = () =>
+  dashboard(null, undefined, {
+    now: new Date(2026, 2, 13, 23, 30),
+    dates: [new Date(2026, 2, 14 - 100, 12), new Date(2026, 2, 14 - 90, 12)],
+  });
+
+test("dashboard opens on 30 days when there is recent usage, and shows the change from the 30 before", () => {
+  const app = loadApp(recent());
+
+  app.evaluate("readHash()");
+  assert.equal(app.evaluate("defaultRange"), "30d");
+  assert.equal(app.evaluate("state.range"), "30d");
+
+  const rows = app.renderKpis();
+
+  assert.equal(rows.find((row) => row.label === "spent")!.value, "$2.00");
+  assert.equal(rows.find((row) => row.label === "vs previous 30d")!.sub, "$1.00");
+});
+
+test("dashboard opens on all history when the last 30 days have no usage", () => {
+  const app = loadApp(stale());
+
+  app.evaluate("readHash()");
+  assert.equal(app.evaluate("defaultRange"), "all");
+  assert.equal(app.evaluate("state.range"), "all");
+  assert.equal(app.renderKpis().find((row) => row.label === "spent")!.value, "$2.00");
+});
+
+test("dashboard reads the range from the link and falls back to the default", () => {
+  for (const [hash, range] of [
+    ["", "30d"],
+    ["#range=all", "all"],
+    ["#range=7d", "7d"],
+    ["#range=month", "month"],
+    ["#range=yesterday", "30d"],
+    ["#range=", "30d"],
+    ["#profile=0", "30d"],
+  ]) {
+    const app = loadApp(recent(), hash);
+
+    app.evaluate("readHash()");
+    assert.equal(app.evaluate("state.range"), range, hash);
+  }
+});
+
+test("dashboard leaves the default range out of the link and keeps any other, all included", () => {
+  const app = loadApp(recent());
+
+  app.evaluate("readHash()");
+
+  for (const [range, hash] of [
+    ["30d", ""],
+    ["all", "#range=all"],
+    ["7d", "#range=7d"],
+    ["30d", ""],
+  ]) {
+    app.evaluate(`state.range = '${range}'; writeHash()`);
+    assert.equal(app.hash(), hash, range);
+  }
+
+  // The choice survives a reload of the link.
+  app.evaluate("state.range = 'all'; writeHash()");
+
+  const reloaded = loadApp(recent(), app.hash());
+
+  reloaded.evaluate("readHash()");
+  assert.equal(reloaded.evaluate("state.range"), "all");
+});
+
+test("dashboard writes 30 days to the link when the default is all history", () => {
+  const app = loadApp(stale());
+
+  app.evaluate("readHash()");
+
+  for (const [range, hash] of [
+    ["all", ""],
+    ["30d", "#range=30d"],
+  ]) {
+    app.evaluate(`state.range = '${range}'; writeHash()`);
+    assert.equal(app.hash(), hash, range);
+  }
+});
+
+test("dashboard keeps other link settings when the range changes", () => {
+  const app = loadApp(recent(), "#profile=0&theme=light");
+
+  app.evaluate("readHash()");
+  app.evaluate("state.range = 'all'; writeHash()");
+
+  const params = new URLSearchParams(app.hash().slice(1));
+
+  assert.equal(params.get("range"), "all");
+  assert.equal(params.get("profile"), "0");
+  assert.equal(params.get("theme"), "light");
+});

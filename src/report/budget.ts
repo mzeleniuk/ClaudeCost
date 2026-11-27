@@ -1,10 +1,7 @@
-import { fmtUSD, warn } from "./format.ts";
+import { fmtUSD, roundUSD, warn } from "./format.ts";
 import { monthName } from "./monthlyTable.ts";
 import { INDENT, headingLines } from "./table.ts";
 import type { BudgetReport } from "../types.ts";
-
-// A cost rounded for JSON output, like roundCost.
-const round = (n: number) => Number(n.toFixed(6));
 
 // How far `amount` is above `limit`, or "" when it is not.
 function overBy(amount: number, limit: number | null) {
@@ -41,11 +38,11 @@ export function budgetJson({ month, spentUSD, limitUSD, forecast }: BudgetReport
 
   return {
     month,
-    spentUSD: round(spentUSD),
+    spentUSD: roundUSD(spentUSD),
     budgetUSD: limitUSD,
     overBudget: over(spentUSD),
     forecast: forecast && {
-      projectedUSD: forecast.projectedUSD == null ? null : round(forecast.projectedUSD),
+      projectedUSD: forecast.projectedUSD == null ? null : roundUSD(forecast.projectedUSD),
       overBudget: over(forecast.projectedUSD),
     },
   };

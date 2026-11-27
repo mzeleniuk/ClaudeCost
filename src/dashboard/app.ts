@@ -292,8 +292,9 @@ const RANGES = [
 const isRangeId = (v: unknown): v is RangeId => RANGES.some((r) => r.id === v);
 
 const state = {
-  range: "all",
-  /** Profile index, or -1 for all profiles. */
+  // readHash sets the range the page opens on.
+  range: "all" as RangeId,
+  // Profile index, or -1 for all profiles.
   profile: -1,
   modelOn: Array.from({ length: NMODELS }, () => true),
   projectOn: Array.from({ length: NPROJECTS }, () => true),
@@ -332,7 +333,7 @@ function readActive(params: URLSearchParams, key: string, n: number) {
 function readHash() {
   const params = new URLSearchParams(location.hash.slice(1));
   const range = params.get("range");
-  state.range = isRangeId(range) ? range : "all";
+  state.range = isRangeId(range) ? range : defaultRange;
   const rawProfile = params.get("profile") ?? "";
   const profile = /^\d+$/.test(rawProfile) ? Number(rawProfile) : -1;
   state.profile = profile < NPROFILES ? profile : -1;
@@ -347,7 +348,7 @@ function writeHash() {
   const params = new URLSearchParams(location.hash.slice(1));
   for (const key of ["range", "profile", "models", "projects"]) params.delete(key);
 
-  if (state.range !== "all") params.set("range", state.range);
+  if (state.range !== defaultRange) params.set("range", state.range);
   if (state.profile >= 0) params.set("profile", String(state.profile));
   if (state.modelOn.includes(false)) params.set("models", activeList(state.modelOn));
   if (state.projectOn.includes(false)) params.set("projects", activeList(state.projectOn));
@@ -368,27 +369,37 @@ function writeHash() {
 // Inclusive day-index bounds of the selected range. Empty when hi < lo.
 const view = { lo: 0, hi: -1 };
 
-function computeView() {
-  if (state.range === "all") {
-    view.lo = 0;
-    view.hi = NDAYS - 1;
-    return;
-  }
+function rangeBounds(range: RangeId) {
+  if (range === "all") return { lo: 0, hi: NDAYS - 1 };
 
   // The collector can retain usage dated tomorrow when a transcript's clock
   // is ahead. Recent ranges and their comparisons end on the generation day.
-  view.hi = data.days.findLastIndex((day) => day <= generated.date);
+  const hi = data.days.findLastIndex((day) => day <= generated.date);
 
-  if (state.range === "month") {
-    const key = generated.date.slice(0, 7);
-    const first = dayMonthKey.indexOf(key);
-
-    view.lo = first < 0 ? NDAYS : first;
-  } else {
-    const n = RANGES.find((r) => r.id === state.range)?.days ?? 0;
-    view.lo = Math.max(0, view.hi - n + 1);
+  if (range === "month") {
+    const first = dayMonthKey.indexOf(generated.date.slice(0, 7));
+    return { lo: first < 0 ? NDAYS : first, hi };
   }
+
+  const n = RANGES.find((r) => r.id === range)?.days ?? 0;
+  return { lo: Math.max(0, hi - n + 1), hi };
 }
+
+function computeView() {
+  Object.assign(view, rangeBounds(state.range));
+}
+
+/**
+ * The range the page opens on, and the one a link leaves out. A recent range
+ * has a "vs previous" tile and all history does not, so the page opens on 30
+ * days. With no usage in them it opens on all history, not on an empty page.
+ */
+function pickDefaultRange(): RangeId {
+  const { lo, hi } = rangeBounds("30d");
+  return F.day.some((day) => day >= lo && day <= hi) ? "30d" : "all";
+}
+
+const defaultRange = pickDefaultRange();
 
 // The equal-length period before the range, or null when not comparable.
 function previousBounds() {

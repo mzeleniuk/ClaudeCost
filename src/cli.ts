@@ -4,6 +4,7 @@ import { parseArgs } from "node:util";
 import { aggregate, aggregateByMonth } from "./aggregate.ts";
 import { backupStore } from "./backup.ts";
 import { buildBudget, parseBudget } from "./budget.ts";
+import { parseCompare, periodUsage, previousPeriod } from "./compare.ts";
 import { readEvents } from "./events.ts";
 import { emptyParseStats } from "./parse.ts";
 import { loadPricing, priceForModel } from "./pricing.ts";
@@ -16,6 +17,7 @@ import { collectDashboard } from "./dashboard/collect.ts";
 import { fileLink, summarizeDashboard, summarizeTokens, writeDashboardFile } from "./dashboard/output.ts";
 import { renderDashboard } from "./dashboard/render.ts";
 import { budgetLines, overBudgetMessages, paceMessages } from "./report/budget.ts";
+import { compareLines } from "./report/compare.ts";
 import { renderJson } from "./report/json.ts";
 import { renderMonthlyJson } from "./report/monthlyJson.ts";
 import { renderMonthlyTable } from "./report/monthlyTable.ts";
@@ -33,8 +35,10 @@ import type { Unpriced } from "./report/unpriced.ts";
 import type {
   AggregateResult,
   BudgetReport,
+  CompareReport,
   MonthlyResult,
   ParseStats,
+  Period,
   PricingSummary,
   PricingTable,
   Profile,
@@ -76,6 +80,13 @@ OPTIONS
                       cost 10% more. Overrides the region in
                       settings.config.json and in profiles.
                       ${REGIONS.join(", ")}
+  --compare previous  Set the period --since or --monthly picks against the
+                      period of the same length right before it, and print the
+                      change in cost. For --monthly, that is the same stretch
+                      of the previous month, up to the same day and time.
+                      With --by-model it lists the change per model. With
+                      --json it adds a "compare" key. Not with --by-month or
+                      --dashboard.
   --budget <usd>      Warn on stderr when this month's spend passes <usd>.
                       The month is the current calendar month in local time,
                       whatever --since says. Overrides "budget" in
@@ -126,6 +137,8 @@ EXAMPLES
   claude-cost --by-month --since 2025-01-01 --json
   claude-cost --dir ~/.claude/projects --pricing ./my-prices.json
   claude-cost --strict --json > usage.json
+  claude-cost --since 7d --compare previous
+  claude-cost --monthly --by-model --compare previous
   claude-cost --budget 200 --forecast
   claude-cost --budget 200 --strict --since 7d
   claude-cost --region us --by-model
@@ -137,17 +150,18 @@ EXAMPLES
   claude-cost --backup ~/Documents/claude-cost-backups
 `;
 
-// What a scan needs besides the directories to read.
+// What a scan needs besides the directories to read. `until` is exclusive.
 interface Scan {
   pricing: PricingTable;
   since: Date | null;
+  until?: Date | null;
   store: StoreMode;
 }
 
 // Scan transcripts in `dirs`, drop duplicate snapshots and total them, grouped by model on request.
-async function collectUsage(dirs: string[], { pricing, since, store }: Scan, byModel: boolean) {
+async function collectUsage(dirs: string[], { pricing, since, until, store }: Scan, byModel: boolean) {
   const parse = emptyParseStats();
-  return aggregate(await readEvents(dirs, store, parse), { pricing, since, byModel, parse });
+  return aggregate(await readEvents(dirs, store, parse), { pricing, since, until, byModel, parse });
 }
 
 // Scan transcripts in `dirs`, drop duplicate snapshots and total them per month and model.
@@ -187,10 +201,17 @@ function renderUsage(
     pricingFile,
     json,
     budget,
-  }: Origin & { byModel: boolean; since: Date | null; json: boolean; budget: BudgetReport | null },
+    compare,
+  }: Origin & {
+    byModel: boolean;
+    since: Date | null;
+    json: boolean;
+    budget: BudgetReport | null;
+    compare: CompareReport | null;
+  },
 ) {
   const opts = { byModel, since, region, pricingFile };
-  return json ? renderJson(result, { ...opts, budget }) : renderTable(result, opts);
+  return json ? renderJson(result, { ...opts, budget, compare }) : renderTable(result, opts);
 }
 
 function renderMonthly(
@@ -232,23 +253,48 @@ function resolveSource({
   };
 }
 
+// What decides a source's region and pricing file, and which sources there are.
+interface SourceFlags {
+  pricingFlag: string | undefined;
+  regionFlag: string | null;
+  settings: { region: string };
+}
+
+interface SourceInput extends SourceFlags {
+  profiles: Profile[] | null;
+  dir: string | undefined;
+}
+
+// Transcript directories to read, with the pricing they are priced at.
+interface Source {
+  dirs: string[];
+  pricing: PricingTable;
+  pricingFile: string;
+}
+
+/**
+ * The sources a second scan reads: one per profile, or the directories --dir
+ * names. Each is priced with its own pricing file and region.
+ */
+function scanSources({ profiles, dir, ...sourceFlags }: SourceInput): Source[] {
+  if (!profiles) {
+    const { pricing, pricingFile } = resolveSource({ profile: null, ...sourceFlags });
+    return [{ dirs: resolveTranscriptDirs(dir), pricing, pricingFile }];
+  }
+
+  return profiles.map((profile) => {
+    const { pricing, pricingFile } = resolveSource({ profile, ...sourceFlags });
+    return { dirs: [profile.projectsDir], pricing, pricingFile };
+  });
+}
+
 /**
  * The current month's spend across every profile, or across the directories
  * --dir names, for --budget and --forecast. It reads the month whatever
  * --since says, and it prices each profile with its own pricing file and region.
  */
 async function collectBudget(
-  {
-    profiles,
-    dir,
-    ...sourceFlags
-  }: {
-    profiles: Profile[] | null;
-    dir: string | undefined;
-    pricingFlag: string | undefined;
-    regionFlag: string | null;
-    settings: { region: string };
-  },
+  input: SourceInput,
   {
     limit,
     forecast,
@@ -259,21 +305,53 @@ async function collectBudget(
   const since = startOfMonth(now);
   const key = monthKey(now);
 
-  const sources = profiles
-    ? profiles.map((profile) => ({
-        dirs: [profile.projectsDir],
-        pricing: resolveSource({ profile, ...sourceFlags }).pricing,
-      }))
-    : [{ dirs: resolveTranscriptDirs(dir), pricing: resolveSource({ profile: null, ...sourceFlags }).pricing }];
-
   let spentUSD = 0;
 
-  for (const { dirs, pricing } of sources) {
+  for (const { dirs, pricing } of scanSources(input)) {
     const { months } = await collectMonthly(dirs, { pricing, since, store });
     spentUSD += (key && months.get(key)?.total.costUSD) || 0;
   }
 
   return buildBudget({ spentUSD, limitUSD: limit, forecast, now });
+}
+
+// The comparison for --compare, and the models its previous period priced at $0.
+interface Compared {
+  report: CompareReport;
+  unpriced: Unpriced[];
+}
+
+/**
+ * Scan the period before the report's and set it against the totals the
+ * report already has, so the current figures match the report above them.
+ * Usage in the previous period that no pricing file prices counts as unpriced.
+ */
+async function collectCompare(
+  sources: Source[],
+  {
+    current,
+    periods,
+    byModel,
+    store,
+  }: { current: AggregateResult[]; periods: { current: Period; previous: Period }; byModel: boolean; store: StoreMode },
+): Promise<Compared> {
+  const scans = [];
+
+  for (const { dirs, pricing, pricingFile } of sources) {
+    scans.push({ pricingFile, result: await collectUsage(dirs, { pricing, ...periods.previous, store }, byModel) });
+  }
+
+  return {
+    report: {
+      current: periodUsage(periods.current, current),
+      previous: periodUsage(
+        periods.previous,
+        scans.map(({ result }) => result),
+      ),
+      byModel,
+    },
+    unpriced: scans.map(unpricedOf),
+  };
 }
 
 /**
@@ -386,6 +464,7 @@ export async function run(argv: string[]) {
       budget: { type: "string" },
       "by-model": { type: "boolean", default: false },
       "by-month": { type: "boolean", default: false },
+      compare: { type: "string" },
       dashboard: { type: "boolean", default: false },
       dir: { type: "string" },
       forecast: { type: "boolean", default: false },
@@ -440,8 +519,16 @@ export async function run(argv: string[]) {
     throw new Error("use either --no-cache or --rebuild-cache, not both.");
   }
 
+  if (values.compare != null) {
+    parseCompare(values.compare, "--compare");
+
+    if (values["by-month"]) {
+      throw new Error("use either --compare or --by-month, not both. --by-month already lists every month.");
+    }
+  }
+
   if (values.dashboard) {
-    const conflicts = ["json", "by-model", "by-month", "monthly"] as const;
+    const conflicts = ["json", "by-model", "by-month", "monthly", "compare"] as const;
 
     for (const flag of conflicts) {
       if (values[flag]) {
@@ -458,7 +545,17 @@ export async function run(argv: string[]) {
 
   const byModel = values["by-model"];
   const byMonth = values["by-month"];
-  const since = values.monthly ? startOfMonth() : parseSince(values.since);
+  const now = new Date();
+  const since = values.monthly ? startOfMonth(now) : parseSince(values.since, now);
+
+  // The period before the report's, which --compare scans after the report.
+  let previous: Period | null = null;
+
+  if (values.compare != null) {
+    if (!since) throw new Error("--compare needs --since or --monthly to say which period to compare.");
+    previous = previousPeriod(since, now);
+  }
+
   const regionFlag = values.region != null ? validateRegion(values.region, "--region") : null;
   const limit = values.budget != null ? parseBudget(values.budget, "--budget") : null;
   const settings = loadSettings();
@@ -483,9 +580,13 @@ export async function run(argv: string[]) {
   // That read rewrote the store when --rebuild-cache asked for it, so the report reads it as it is.
   const reportStore: StoreMode = budget ? { ...store, rebuild: false } : store;
 
-  // A text report is followed by the budget block. A JSON report has it inside.
+  // A text report is followed by the compare and budget blocks. A JSON report has them inside.
   const printBudget = () => {
     if (budget && !values.json) print(budgetLines(budget).join("\n"));
+  };
+
+  const printCompare = (compared: Compared | null) => {
+    if (compared && !values.json) print(compareLines(compared.report).join("\n"));
   };
 
   if (values.dashboard) {
@@ -526,6 +627,17 @@ export async function run(argv: string[]) {
   const sourceFlags = { pricingFlag: values.pricing, regionFlag, settings };
   const scanOf = (pricing: PricingTable): Scan => ({ pricing, since, store: reportStore });
 
+  // The report scan has rebuilt the store when --rebuild-cache asked for it.
+  const compareWith = async (current: AggregateResult[]): Promise<Compared | null> =>
+    since && previous
+      ? collectCompare(scanSources({ profiles, dir: values.dir, ...sourceFlags }), {
+          current,
+          periods: { current: { since, until: now }, previous },
+          byModel,
+          store: { ...reportStore, rebuild: false },
+        })
+      : null;
+
   if (profiles) {
     const options = { since, json: values.json, budget };
 
@@ -549,11 +661,14 @@ export async function run(argv: string[]) {
       collectUsage(dirs, scanOf(pricing), byModel),
     );
 
-    print(renderProfileReports({ byMonth: false, byModel, reports }, options));
+    const compared = await compareWith(reports.map((report) => report.result));
+
+    print(renderProfileReports({ byMonth: false, byModel, reports }, { ...options, compare: compared?.report }));
+    printCompare(compared);
     printBudget();
 
     return reportWarnings(
-      reports.map(unpricedOf),
+      [...reports.map(unpricedOf), ...(compared?.unpriced ?? [])],
       reports.map((report) => report.result.parse),
       values.strict,
       budget,
@@ -574,9 +689,16 @@ export async function run(argv: string[]) {
   }
 
   const result = await collectUsage(dirs, scanOf(pricing), byModel);
+  const compared = await compareWith([result]);
 
-  print(renderUsage(result, { ...origin, byModel }));
+  print(renderUsage(result, { ...origin, byModel, compare: compared?.report ?? null }));
+  printCompare(compared);
   printBudget();
 
-  return reportWarnings([unpricedOf({ pricingFile, result })], [result.parse], values.strict, budget);
+  return reportWarnings(
+    [unpricedOf({ pricingFile, result }), ...(compared?.unpriced ?? [])],
+    [result.parse],
+    values.strict,
+    budget,
+  );
 }

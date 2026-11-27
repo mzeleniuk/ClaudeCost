@@ -45,11 +45,13 @@ claude-cost --dir ~/.claude/projects
 claude-cost --forecast              # project this month's total from the pace so far
 claude-cost --json                  # machine-readable output
 claude-cost --monthly               # since start of current month
+claude-cost --monthly --compare previous  # that against the same stretch of last month
 claude-cost --pricing ./my-prices.json
 claude-cost --region us             # price at the US multi-region endpoint
 claude-cost --since 2025-01-01      # since local midnight on a date
 claude-cost --since 2025-01-15T10:00  # since a local date and time
 claude-cost --since 7d              # last 7 days
+claude-cost --since 7d --compare previous  # that against the 7 days before
 claude-cost --since today           # since local midnight
 ```
 
@@ -82,7 +84,11 @@ It contains your project names and what each cost. By default it goes in the sto
 
 Project names come from the transcript folder names. Claude Code writes `/Users/me/Dev/app` as `-Users-me-Dev-app`, which cannot be reversed with certainty, so the CLI looks for a directory on disk that matches. If the directory is gone, the dashboard shows the folder name instead.
 
-`--dashboard` cannot be combined with `--json`, `--by-model`, `--by-month` or `--monthly`. `--out` needs `--dashboard`.
+The page opens on the last 30 days. When none of your usage falls in them, it opens on all history. The range tabs at the top switch between 7, 30 and 90 days, the month and all history, and the choice goes into the page link, so a reload or a copied link keeps it. A link that has no range opens on the default, and `#range=all` opens all history.
+
+The `spent` tile is followed by a "vs previous" tile for the 7, 30 and 90 day ranges and for the month. It sets the range against the period of equal length before it, or against the same days of the previous month for the month range. It shows the change in percent and what the earlier period cost. It is not shown for `all`, when the earlier period has no spend, or when the data does not reach back to the start of the earlier period. `--since` can cut the data short of that.
+
+`--dashboard` cannot be combined with `--json`, `--by-model`, `--by-month`, `--monthly` or `--compare`. `--out` needs `--dashboard`.
 
 ## Flags
 
@@ -98,6 +104,7 @@ Project names come from the transcript folder names. Claude Code writes `/Users/
 | `--dir`           | Override transcript directory. Ignores `profiles.config.json`.    |
 | `--pricing`       | Path to a custom pricing JSON. Overrides per-profile pricing.     |
 | `--region`        | Vertex AI endpoint you call. Overrides every other setting.       |
+| `--compare`       | `previous`: set the period against the one before it. See below.  |
 | `--budget`        | Warn when this month's spend passes this many USD. See below.     |
 | `--forecast`      | Project this month's spend to the end of the month. See below.    |
 | `--strict`        | Exit 1 on unpriced models, unreadable lines or a passed budget.   |
@@ -223,6 +230,56 @@ claude-cost: warning: November 2026 is on pace for $177.92, $17.92 over the $160
 ```
 
 The month is a second scan next to the report, which the usage store keeps fast. With `--no-cache` the run reads every transcript twice.
+
+## Compare periods
+
+`--compare previous` sets the report's period against the period before it, and prints the change in cost. It needs `--since` or `--monthly`, because without one the report covers all history and nothing comes before it.
+
+```bash
+claude-cost --since 7d --compare previous
+claude-cost --monthly --compare previous
+claude-cost --since 7d --by-model --compare previous
+```
+
+A text report ends with a block for both periods. `--by-model` adds a row for each model that either period used, with the models of the current period first:
+
+```text
+⏺ Compared with the previous period
+  ⎿  This period  2026-11-19 17:18:44 to 2026-11-26 17:18:44 local
+     Previous     2026-11-12 17:18:44 to 2026-11-19 17:18:44 local
+
+     model               this period  previous          change
+     claude-sonnet-5-5        $31.20    $22.10   +$9.10 (+41%)
+     claude-opus-5-5          $12.40    $20.35   -$7.95 (-39%)
+     ─────────────────────────────────────────────────────────
+     total                    $43.60    $42.45   +$1.15 (+3%)
+```
+
+The previous period depends on what the report covers:
+
+- With `--since`, it is the stretch of equal length that ends where the report starts. `--since 7d` compares the last 7 days with the 7 days before them. The report runs up to the moment the command starts.
+- With `--monthly`, it is the same stretch of the previous month, from its first day to the same day and time. On 26 November at 17:18 that is 1 October to 26 October at 17:18. A whole previous month would make every month look cheaper until its last day. When the previous month has fewer days than the current one has reached, the previous period is that whole month.
+
+The change is this period's cost minus the previous period's, in dollars and as a percent of the previous cost. The percent is left out when the previous period cost nothing. The current figures are the ones in the report above the block. With profiles, the block adds up every profile, and each profile is priced with its own pricing file and region.
+
+A `--json` report gets a `compare` key. `until` is exclusive, and the current period ends when the command started. `changePercent` is null when the previous period cost nothing, and `byModel` is there only with `--by-model`:
+
+```json
+"compare": {
+  "against": "previous",
+  "current": { "since": "2026-11-19T15:18:44.000Z", "until": "2026-11-26T15:18:44.000Z", "total": { "costUSD": 43.6, "...": "..." } },
+  "previous": { "since": "2026-11-12T15:18:44.000Z", "until": "2026-11-19T15:18:44.000Z", "total": { "costUSD": 42.45, "...": "..." } },
+  "changeUSD": 1.15,
+  "changePercent": 2.7,
+  "byModel": {
+    "claude-opus-5-5": { "currentUSD": 12.4, "previousUSD": 20.35, "changeUSD": -7.95, "changePercent": -39.1 }
+  }
+}
+```
+
+The previous period is a second scan, which the usage store keeps fast. With `--no-cache` the run reads every transcript twice. Usage in the previous period is priced like the rest, so a model that only the previous period used and the pricing file lacks gets the same warning, and `--strict` exits with status 1. This differs from the other reports, where usage before `--since` does not count.
+
+`--compare` cannot be combined with `--by-month`, which already lists every month, or with `--dashboard`, which has its own comparison. See [Dashboard](#dashboard).
 
 ## Unreadable transcript lines
 
